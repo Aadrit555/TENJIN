@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing & Linting
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.ruff_cache/
+.mypy_cache/
+
+# TENJIN Runtime Data (Isolated Workspaces, Database, Reports, Logs)
+workspaces/
+reports/
+logs/
+data/*.db
+data/*.sqlite*
+!data/.gitkeep
+*.pid
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
