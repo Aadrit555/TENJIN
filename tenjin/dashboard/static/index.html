@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TENJIN // Autonomous Engineering Console</title>
+  <style>
+    :root {
+      --bg: #090a0f;
+      --surface: #12141c;
+      --surface-border: #1e2230;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --info: #6366f1;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--surface-border);
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .badge-critical { background: #450a0a; color: #f87171; border: 1px solid #7f1d1d; }
+    .badge-high { background: #451a03; color: #fb923c; border: 1px solid #7c2d12; }
+    .badge-medium { background: #422006; color: #facc15; border: 1px solid #713f12; }
+    .badge-low { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .badge-success { background: #064e3b; color: #34d399; border: 1px solid #065f46; }
+    
+    nav {
+      display: flex;
+      gap: 4px;
+    }
+    nav button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      border-radius: 4px;
+    }
+    nav button:hover {
+      color: var(--text-main);
+      background: var(--surface-border);
+    }
+    nav button.active {
+      color: var(--primary);
+      background: #0f172a;
+      border-color: #38bdf840;
+    }
+    
+    .status-bar {
+      display: flex;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .btn {
+      padding: 4px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      border: 1px solid transparent;
+    }
+    .btn-danger { background: #7f1d1d; color: #fca5a5; border-color: #b91c1c; }
+    .btn-warning { background: #713f12; color: #fde047; border-color: #a16207; }
+    .btn-secondary { background: #1e293b; color: #cbd5e1; border-color: #334155; }
+    .btn-primary { background: #0369a1; color: #bae6fd; border-color: #0284c7; }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 4px;
+      padding: 14px;
+    }
+    .card-title {
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      margin-bottom: 6px;
+    }
+    .card-value {
+      font-size: 24px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--surface-border);
+    }
+    th {
+      background: #0f172a;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+    tr:hover { background: #151824; }
+    
+    pre {
+      background: #050608;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--surface-border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #94a3b8;
+      overflow-x: auto;
+      max-height: 400px;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 6px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+    .modal-body {
+      padding: 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>TENJIN // 天神</span>
+      <span class="badge badge-success" id="daemon-status">DAEMON ACTIVE</span>
+    </div>
+    <nav>
+      <button class="active" onclick="switchTab('overview')">Overview</button>
+      <button onclick="switchTab('repositories')">Repositories</button>
+      <button onclick="switchTab('findings')">Findings</button>
+      <button onclick="switchTab('runs')">Runs</button>
+      <button onclick="switchTab('system')">System</button>
+      <button onclick="switchTab('config')">Configuration</button>
+    </nav>
+    <div class="status-bar">
+      <button class="btn btn-warning" onclick="pauseScheduler()">Pause</button>
+      <button class="btn btn-secondary" onclick="resumeScheduler()">Resume</button>
+      <button class="btn btn-danger" onclick="emergencyStop()">Emergency Stop</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- OVERVIEW TAB -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-title">Monitored Repositories</div>
+          <div class="card-value" id="stat-repos">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Open Findings</div>
+          <div class="card-value" id="stat-findings" style="color: var(--warning);">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Critical Security Issues</div>
+          <div class="card-value" id="stat-critical" style="color: var(--danger);">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Verified Auto-Fixes</div>
+          <div class="card-value" id="stat-fixes" style="color: var(--success);">0</div>
+        </div>
+      </div>
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-title">Commits Created</div>
+          <div class="card-value" id="stat-commits">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Pushes Completed</div>
+          <div class="card-value" id="stat-pushes">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Pull Requests Opened</div>
+          <div class="card-value" id="stat-prs">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Runs Executed</div>
+          <div class="card-value" id="stat-runs">0</div>
+        </div>
+      </div>
+
+      <h3 style="margin: 20px 0 10px 0; font-family: var(--font-mono);">Recent Autonomous Runs</h3>
+      <table id="overview-runs-table">
+        <thead>
+          <tr>
+            <th>Run ID</th>
+            <th>Repository</th>
+            <th>State</th>
+            <th>Started At</th>
+            <th>Duration</th>
+            <th>Findings</th>
+            <th>Fixed</th>
+          </tr>
+        </thead>
+        <tbody id="overview-runs-body">
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading recent runs...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- REPOSITORIES TAB -->
+    <div id="tab-repositories" class="tab-content">
+      <h3 style="margin-bottom: 12px; font-family: var(--font-mono);">Discovered GitHub Repositories</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Repository</th>
+            <th>Default Branch</th>
+            <th>Language</th>
+            <th>Visibility</th>
+            <th>Health Score</th>
+            <th>Last Audit</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="repos-body">
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading repositories...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- FINDINGS TAB -->
+    <div id="tab-findings" class="tab-content">
+      <h3 style="margin-bottom: 12px; font-family: var(--font-mono);">Audit Findings Registry</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Severity</th>
+            <th>Category</th>
+            <th>Repository</th>
+            <th>File / Line</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="findings-body">
+          <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading findings...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RUNS TAB -->
+    <div id="tab-runs" class="tab-content">
+      <h3 style="margin-bottom: 12px; font-family: var(--font-mono);">Run Execution History</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Run ID</th>
+            <th>Repository</th>
+            <th>Base SHA</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Findings</th>
+            <th>Fixed</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="runs-body">
+          <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading runs...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SYSTEM TAB -->
+    <div id="tab-system" class="tab-content">
+      <h3 style="margin-bottom: 12px; font-family: var(--font-mono);">Environment & Toolchain Inventory</h3>
+      <div id="system-details" style="display: flex; flex-direction: column; gap: 14px;">
+        <pre id="system-json">Loading system telemetry...</pre>
+      </div>
+    </div>
+
+    <!-- CONFIG TAB -->
+    <div id="tab-config" class="tab-content">
+      <h3 style="margin-bottom: 12px; font-family: var(--font-mono);">Effective Configuration (Secrets Redacted)</h3>
+      <pre id="config-json">Loading configuration...</pre>
+    </div>
+  </main>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal" id="modal" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span id="modal-title">Details</span>
+        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+      <div class="modal-body" id="modal-content"></div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      event.target.classList.add('active');
+
+      if (tab === 'overview') loadOverview();
+      if (tab === 'repositories') loadRepositories();
+      if (tab === 'findings') loadFindings();
+      if (tab === 'runs') loadRuns();
+      if (tab === 'system') loadSystem();
+      if (tab === 'config') loadConfig();
+    }
+
+    async function loadOverview() {
+      const res = await fetch('/api/stats');
+      const data = await res.json();
+      document.getElementById('stat-repos').innerText = data.repositories_count;
+      document.getElementById('stat-findings').innerText = data.open_findings;
+      document.getElementById('stat-critical').innerText = data.critical_findings;
+      document.getElementById('stat-fixes').innerText = data.fixed_findings;
+      document.getElementById('stat-commits').innerText = data.commits_created;
+      document.getElementById('stat-pushes').innerText = data.pushes_completed;
+      document.getElementById('stat-prs').innerText = data.prs_opened;
+      document.getElementById('stat-runs').innerText = data.total_runs;
+
+      const runsRes = await fetch('/api/runs?limit=5');
+      const runs = await runsRes.json();
+      const tbody = document.getElementById('overview-runs-body');
+      tbody.innerHTML = runs.map(r => `
+        <tr>
+          <td style="font-family: var(--font-mono);">${r.run_id}</td>
+          <td>${r.repository}</td>
+          <td><span class="badge ${r.state === 'COMPLETED' ? 'badge-success' : 'badge-low'}">${r.state}</span></td>
+          <td>${r.started_at ? r.started_at.substring(0, 19).replace('T', ' ') : '-'}</td>
+          <td>${r.duration_seconds || 0}s</td>
+          <td>${r.findings_count}</td>
+          <td>${r.fixed_count}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="7">No runs recorded yet.</td></tr>';
+    }
+
+    async function loadRepositories() {
+      const res = await fetch('/api/repositories');
+      const data = await res.json();
+      const tbody = document.getElementById('repos-body');
+      tbody.innerHTML = data.map(r => `
+        <tr>
+          <td style="font-weight: 600;">${r.full_name}</td>
+          <td style="font-family: var(--font-mono);">${r.default_branch}</td>
+          <td>${r.language || 'N/A'}</td>
+          <td>${r.is_private ? 'Private' : 'Public'}</td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: ${r.health_score > 80 ? 'var(--success)' : 'var(--warning)'};">${r.health_score}</td>
+          <td>${r.last_audit_at ? r.last_audit_at.substring(0, 19).replace('T', ' ') : 'Never'}</td>
+          <td><span class="badge badge-success">${r.status}</span></td>
+        </tr>
+      `).join('') || '<tr><td colspan="7">No repositories discovered.</td></tr>';
+    }
+
+    async function loadFindings() {
+      const res = await fetch('/api/findings');
+      const data = await res.json();
+      const tbody = document.getElementById('findings-body');
+      tbody.innerHTML = data.map(f => `
+        <tr>
+          <td style="font-family: var(--font-mono);">${f.id}</td>
+          <td><span class="badge badge-${f.severity}">${f.severity}</span></td>
+          <td>${f.category}</td>
+          <td>${f.repository}</td>
+          <td style="font-family: var(--font-mono);">${f.file || 'N/A'}:${f.line_start || ''}</td>
+          <td>${f.title}</td>
+          <td><span class="badge badge-low">${f.status}</span></td>
+          <td>
+            <button class="btn btn-secondary" onclick="viewFinding('${f.id}')">View</button>
+            ${f.status === 'open' ? `<button class="btn btn-primary" onclick="approveFinding('${f.id}')">Approve</button>` : ''}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="8">No findings recorded.</td></tr>';
+    }
+
+    async function loadRuns() {
+      const res = await fetch('/api/runs');
+      const data = await res.json();
+      const tbody = document.getElementById('runs-body');
+      tbody.innerHTML = data.map(r => `
+        <tr>
+          <td style="font-family: var(--font-mono);">${r.run_id}</td>
+          <td>${r.repository}</td>
+          <td style="font-family: var(--font-mono);">${r.base_sha ? r.base_sha.substring(0, 8) : 'N/A'}</td>
+          <td><span class="badge ${r.state === 'COMPLETED' ? 'badge-success' : 'badge-low'}">${r.state}</span></td>
+          <td>${r.duration_seconds || 0}s</td>
+          <td>${r.findings_count}</td>
+          <td>${r.fixed_count}</td>
+          <td><button class="btn btn-secondary" onclick="viewRun('${r.run_id}')">Details</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="8">No runs found.</td></tr>';
+    }
+
+    async function loadSystem() {
+      const res = await fetch('/api/system');
+      const data = await res.json();
+      document.getElementById('system-json').innerText = JSON.stringify(data, null, 2);
+    }
+
+    async function loadConfig() {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      document.getElementById('config-json').innerText = JSON.stringify(data, null, 2);
+    }
+
+    async function viewFinding(id) {
+      const res = await fetch('/api/findings/' + id);
+      const data = await res.json();
+      document.getElementById('modal-title').innerText = `Finding: ${id}`;
+      document.getElementById('modal-content').innerHTML = `
+        <h4 style="margin-bottom: 8px;">${data.finding.title}</h4>
+        <p style="color: var(--text-muted); margin-bottom: 12px;">${data.finding.summary}</p>
+        <p><strong>Evidence:</strong></p>
+        <pre>${data.finding.evidence}</pre>
+        <p style="margin-top: 10px;"><strong>Suggested Fix:</strong> ${data.finding.suggested_fix || 'N/A'}</p>
+      `;
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    async function viewRun(id) {
+      const res = await fetch('/api/runs/' + id);
+      const data = await res.json();
+      document.getElementById('modal-title').innerText = `Run: ${id}`;
+      document.getElementById('modal-content').innerHTML = `
+        <p><strong>Repository:</strong> ${data.run.repository}</p>
+        <p><strong>State Transitions:</strong></p>
+        <pre>${data.state_transitions.map(t => `${t.timestamp}: ${t.from_state} -> ${t.to_state} (${t.reason})`).join('\n')}</pre>
+        <p style="margin-top: 10px;"><strong>Git Actions:</strong></p>
+        <pre>${JSON.stringify(data.git_actions, null, 2)}</pre>
+      `;
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('modal').style.display = 'none';
+    }
+
+    async function pauseScheduler() {
+      await fetch('/api/scheduler/pause', { method: 'POST' });
+      alert('Scheduler paused.');
+    }
+    async function resumeScheduler() {
+      await fetch('/api/scheduler/resume', { method: 'POST' });
+      alert('Scheduler resumed.');
+    }
+    async function emergencyStop() {
+      if (confirm('Activate EMERGENCY STOP? This suspends all operations immediately.')) {
+        await fetch('/api/scheduler/emergency-stop', { method: 'POST' });
+        alert('EMERGENCY STOP ACTIVATED.');
+      }
+    }
+    async function approveFinding(id) {
+      await fetch('/api/findings/' + id + '/approve', { method: 'POST' });
+      loadFindings();
+    }
+
+    loadOverview();
+  </script>
+</body>
+</html>
