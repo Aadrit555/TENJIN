@@ -12,6 +12,7 @@ import logging
 import subprocess
 import time
 from typing import Any, Dict, List, Optional
+
 import httpx
 
 from tenjin.core.capabilities import _find_executable
@@ -161,7 +162,7 @@ class GitHubClient:
             except (httpx.RequestError, httpx.HTTPStatusError) as e:
                 retries -= 1
                 if retries <= 0:
-                    raise GitHubClientError(f"GitHub API error: {redact_secrets(str(e))}")
+                    raise GitHubClientError(f"GitHub API error: {redact_secrets(str(e))}") from e
                 time.sleep(backoff)
                 backoff *= 2
 

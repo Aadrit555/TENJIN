@@ -6,9 +6,9 @@ to categorize execution risk into TRIVIAL, LOW, MEDIUM, HIGH, or CRITICAL.
 
 from __future__ import annotations
 
-from typing import List, Optional
-from tenjin.core.constants import RiskLevel
+from typing import List
 
+from tenjin.core.constants import RiskLevel
 
 SENSITIVE_DIRECTORY_KEYWORDS = [
     "auth",
@@ -51,7 +51,11 @@ def evaluate_change_risk(
 
     # Diff volume risk
     lines = diff_text.splitlines() if diff_text else []
-    added_or_removed = [l for l in lines if (l.startswith("+") or l.startswith("-")) and not l.startswith(("+++", "---"))]
+    added_or_removed = [
+        line_item
+        for line_item in lines
+        if (line_item.startswith("+") or line_item.startswith("-")) and not line_item.startswith(("+++", "---"))
+    ]
     total_delta = len(added_or_removed)
 
     if total_delta > max_lines_threshold * 2:

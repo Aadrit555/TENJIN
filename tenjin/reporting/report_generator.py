@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
 from tenjin.memory.models import FindingRecord, GitActionRecord, RunRecord, VerificationRunRecord
 from tenjin.security.redaction import redact_secrets

@@ -2,10 +2,14 @@
 
 import tempfile
 from pathlib import Path
+
 import pytest
 
-from tenjin.audit.deduplication import compute_finding_fingerprint, deduplicate_and_reconcile_findings
-from tenjin.core.constants import FindingSeverity, FindingSource, FindingStatus, RiskLevel
+from tenjin.audit.deduplication import (
+    compute_finding_fingerprint,
+    deduplicate_and_reconcile_findings,
+)
+from tenjin.core.constants import FindingSeverity, FindingStatus
 from tenjin.memory.database import Database
 from tenjin.memory.models import FindingRecord, RunRecord
 

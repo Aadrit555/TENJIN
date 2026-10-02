@@ -8,8 +8,7 @@ Git state is treated as authoritative.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from tenjin.core.constants import State
 from tenjin.memory.database import Database

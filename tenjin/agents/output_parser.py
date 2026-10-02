@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("tenjin.agents.parser")
@@ -61,4 +62,4 @@ def parse_agent_output(raw_output: str) -> AgentRepairResult:
         return AgentRepairResult(**data)
     except Exception as e:
         logger.error("Failed to parse agent output as valid schema: %s", e)
-        raise ValueError(f"Agent output did not match required schema: {e}")
+        raise ValueError(f"Agent output did not match required schema: {e}") from e

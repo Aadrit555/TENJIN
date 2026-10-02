@@ -2,8 +2,6 @@
 
 import tempfile
 from pathlib import Path
-import pytest
-import yaml
 
 from tenjin.core.config import TenjinConfig
 from tenjin.core.constants import AutonomyLevel, FindingSeverity, RiskLevel

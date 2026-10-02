@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+
+import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-import uvicorn
 
 from tenjin.dashboard.api import router as api_router
 

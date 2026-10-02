@@ -11,9 +11,8 @@ import logging
 import os
 import platform
 import subprocess
-import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 from tenjin.core.capabilities import _find_executable
 

@@ -11,11 +11,11 @@ import logging
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from tenjin.audit.engine import AuditEngine
 from tenjin.core.capabilities import CapabilityInventory
-from tenjin.memory.models import FindingRecord, VerificationRunRecord
+from tenjin.memory.models import FindingRecord
 from tenjin.policies.policy import EffectivePolicy
 from tenjin.repositories.project_detection import ProjectProfile
 from tenjin.security.isolation import get_sanitized_environment

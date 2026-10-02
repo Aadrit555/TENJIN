@@ -11,20 +11,19 @@ from __future__ import annotations
 import ast
 import json
 import logging
-import os
-import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import List
+
 import yaml
 
 from tenjin.audit.deduplication import compute_finding_fingerprint
 from tenjin.core.capabilities import CapabilityInventory
-from tenjin.core.constants import FindingSeverity, FindingSource, FindingStatus, RiskLevel
+from tenjin.core.constants import FindingSeverity, FindingSource, RiskLevel
 from tenjin.memory.models import FindingRecord
 from tenjin.repositories.project_detection import ProjectProfile, detect_project_profile
-from tenjin.security.redaction import scan_diff_for_secrets, SECRET_PATTERNS
+from tenjin.security.redaction import SECRET_PATTERNS
 
 logger = logging.getLogger("tenjin.audit.engine")
 

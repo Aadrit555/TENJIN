@@ -69,7 +69,7 @@ def redact_secrets(text: str) -> str:
             )
         elif label == "KEY_VALUE_SECRET":
             sanitized = pattern.sub(
-                lambda m: m.group(0).replace(m.group(1), f"[REDACTED_{label}]"),
+                lambda m, lbl=label: m.group(0).replace(m.group(1), f"[REDACTED_{lbl}]"),
                 sanitized,
             )
         elif label == "BEARER_TOKEN":

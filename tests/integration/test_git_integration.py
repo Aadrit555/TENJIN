@@ -3,11 +3,10 @@
 import subprocess
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from tenjin.git.repository import GitRepositoryOperator, compute_diff_hash
-from tenjin.memory.models import RepositoryRecord
-from tenjin.repositories.workspace import WorkspaceManager
 
 
 @pytest.fixture

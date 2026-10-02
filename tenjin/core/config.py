@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
 import yaml
 from pydantic import BaseModel, Field
 
@@ -164,7 +165,6 @@ def load_config(config_path: Optional[str | Path] = None) -> TenjinConfig:
         candidates.append(Path.home() / ".tenjin" / "config.yaml")
 
     data: Dict[str, Any] = {}
-    found_file = False
     for candidate in candidates:
         if candidate.is_file():
             try:
@@ -172,7 +172,6 @@ def load_config(config_path: Optional[str | Path] = None) -> TenjinConfig:
                     content = yaml.safe_load(f)
                     if isinstance(content, dict):
                         data = content
-                        found_file = True
                         break
             except Exception:
                 pass

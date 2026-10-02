@@ -14,7 +14,6 @@ from typing import Optional, Set
 
 from tenjin.core.config import TenjinConfig
 from tenjin.memory.database import Database
-from tenjin.memory.models import RepositoryRecord
 from tenjin.orchestration.coordinator import RunCoordinator
 from tenjin.orchestration.selector import RepositorySelector
 

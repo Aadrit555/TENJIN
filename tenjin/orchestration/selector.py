@@ -8,7 +8,6 @@ Records structured selection rationale and prevents monopolization.
 from __future__ import annotations
 
 import logging
-import math
 import random
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple

@@ -1,12 +1,10 @@
 """Unit tests for JSON and Markdown report generation with secret redaction."""
 
-import json
 import tempfile
 from pathlib import Path
-import pytest
 
-from tenjin.core.constants import FindingSeverity, FindingSource, FindingStatus, RiskLevel, State
-from tenjin.memory.models import FindingRecord, GitActionRecord, RunRecord, VerificationRunRecord
+from tenjin.core.constants import FindingSeverity, RiskLevel, State
+from tenjin.memory.models import FindingRecord, RunRecord
 from tenjin.reporting.report_generator import generate_json_report, generate_markdown_report
 
 

@@ -1,6 +1,5 @@
 """Unit tests for centralized secret redaction and diff scanning."""
 
-import pytest
 from tenjin.security.redaction import contains_secrets, redact_secrets, scan_diff_for_secrets
 
 

@@ -5,6 +5,7 @@ path containment, and secret detection.
 import subprocess
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from tenjin.agents.output_parser import parse_agent_output
@@ -12,7 +13,6 @@ from tenjin.memory.models import RepositoryRecord
 from tenjin.repositories.workspace import DirtyWorkspaceError, WorkspaceManager
 from tenjin.security.isolation import verify_path_containment
 from tenjin.security.prompt_injection import sanitize_untrusted_content
-from tenjin.security.redaction import scan_diff_for_secrets
 
 
 def test_dirty_workspace_halts_to_prevent_data_loss():

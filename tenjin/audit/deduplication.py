@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
-from typing import List, Tuple
+from typing import List
 
 from tenjin.core.constants import FindingStatus
 from tenjin.memory.database import Database

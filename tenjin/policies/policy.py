@@ -8,13 +8,14 @@ but can NEVER elevate autonomy above global configuration boundaries.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
+
 import yaml
 
 from tenjin.core.config import TenjinConfig
-from tenjin.core.constants import AutonomyLevel, FindingSeverity, RiskLevel
+from tenjin.core.constants import AutonomyLevel, RiskLevel
 from tenjin.memory.models import FindingRecord
 
 logger = logging.getLogger("tenjin.policies")

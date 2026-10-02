@@ -14,13 +14,12 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 from tenjin.agents.antigravity import AntigravityRunner
 from tenjin.audit.engine import AuditEngine
 from tenjin.core.capabilities import ToolStatus, discover_capabilities
-from tenjin.core.config import TenjinConfig, load_config
-from tenjin.core.constants import FindingStatus, State
+from tenjin.core.config import load_config
+from tenjin.core.constants import FindingStatus
 from tenjin.core.lifecycle import (
     ProcessLock,
     check_windows_task_status,
@@ -54,7 +53,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
     caps = discover_capabilities()
 
-    print(f"\n[HOST PLATFORM]")
+    print("\n[HOST PLATFORM]")
     print(f"  OS:             {caps.os_name} {caps.os_release} (Version: {caps.os_version})")
     print(f"  Architecture:   {caps.architecture} (64-bit: {caps.is_64bit})")
     print(f"  Python:         {caps.python_version} ({caps.python_path})")
@@ -62,7 +61,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     print(f"  Disk Free:      {caps.hardware.disk_free_gb} GB / {caps.hardware.disk_total_gb} GB")
     print(f"  RAM:            {caps.hardware.free_memory_gb} GB free / {caps.hardware.total_memory_gb} GB total")
 
-    print(f"\n[VERSION CONTROL & GITHUB]")
+    print("\n[VERSION CONTROL & GITHUB]")
     if caps.git_path:
         print(f"  Git:            AVAILABLE ({caps.git_version}) -> {caps.git_path}")
         print(f"  Git User:       {caps.git_user_name or 'Not configured'} <{caps.git_user_email or 'Not configured'}>")
@@ -81,7 +80,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     else:
         print("  GitHub Auth:    NOT AUTHENTICATED (Run 'gh auth login' or export GITHUB_TOKEN)")
 
-    print(f"\n[ANTIGRAVITY AGENT INTEGRATION]")
+    print("\n[ANTIGRAVITY AGENT INTEGRATION]")
     if caps.antigravity.available:
         print(f"  Antigravity CLI: AVAILABLE (Version: {caps.antigravity.cli_version}) -> {caps.antigravity.cli_path}")
         if caps.antigravity.models:
@@ -89,11 +88,11 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     else:
         print("  Antigravity CLI: NOT AVAILABLE (Install Antigravity or ensure 'agy' is on PATH)")
 
-    print(f"\n[AUTOMATION & TASK SCHEDULER]")
+    print("\n[AUTOMATION & TASK SCHEDULER]")
     sched_ok, sched_msg = check_windows_task_status()
     print(f"  Task Scheduler: {sched_msg}")
 
-    print(f"\n[CODE QUALITY & SECURITY SCANNERS]")
+    print("\n[CODE QUALITY & SECURITY SCANNERS]")
     for name, info in caps.tools.items():
         status_str = "AVAILABLE" if info.status == ToolStatus.AVAILABLE else "NOT AVAILABLE"
         details = f"({info.version})" if info.version else ""
@@ -351,7 +350,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     print(f"Emergency Stop:    {'ACTIVE' if state_ctrl.is_emergency_stopped else 'INACTIVE'}")
 
     stats = db.get_system_stats()
-    print(f"\nWork Queue & Statistics:")
+    print("\nWork Queue & Statistics:")
     print(f"  Repositories:    {stats['repositories_count']}")
     print(f"  Total Runs:      {stats['total_runs']}")
     print(f"  Open Findings:   {stats['open_findings']} (Critical: {stats['critical_findings']}, High: {stats['high_findings']})")

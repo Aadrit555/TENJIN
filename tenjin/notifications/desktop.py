@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import platform
 import subprocess
-from typing import Optional
 
 from tenjin.core.capabilities import _find_executable
 from tenjin.security.redaction import redact_secrets

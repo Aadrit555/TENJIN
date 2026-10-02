@@ -15,7 +15,11 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple
 
-from tenjin.agents.output_parser import AgentRepairResult, get_agent_output_json_schema, parse_agent_output
+from tenjin.agents.output_parser import (
+    AgentRepairResult,
+    get_agent_output_json_schema,
+    parse_agent_output,
+)
 from tenjin.core.capabilities import _find_executable
 from tenjin.security.isolation import get_sanitized_environment
 from tenjin.security.redaction import redact_secrets
@@ -107,9 +111,9 @@ class AntigravityRunner:
             parsed = parse_agent_output(res.stdout)
             return parsed, raw_out, duration
 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             duration = round(time.time() - start_time, 2)
-            raise AntigravityInvocationError(f"Antigravity execution timed out after {self.timeout_seconds} seconds")
+            raise AntigravityInvocationError(f"Antigravity execution timed out after {self.timeout_seconds} seconds") from e
         finally:
             try:
                 Path(schema_path).unlink(missing_ok=True)

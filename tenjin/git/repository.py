@@ -10,7 +10,6 @@ import hashlib
 import logging
 import re
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -52,8 +51,8 @@ class GitRepositoryOperator:
                 timeout=timeout,
             )
             return res.returncode, res.stdout.strip(), res.stderr.strip()
-        except subprocess.TimeoutExpired:
-            raise GitAutomationError(f"Git command timed out: {' '.join(args)}")
+        except subprocess.TimeoutExpired as e:
+            raise GitAutomationError(f"Git command timed out: {' '.join(args)}") from e
 
     def create_isolated_branch(self, branch_identifier: str) -> str:
         """Create a dedicated autonomous branch named forge/<safe_id>."""

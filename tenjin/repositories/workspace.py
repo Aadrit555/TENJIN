@@ -9,7 +9,6 @@ and working tree cleanliness.
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -79,8 +78,8 @@ class WorkspaceManager:
             if check and res.returncode != 0:
                 raise WorkspaceError(f"Git command failed ({' '.join(args)}): {redact_secrets(res.stderr)}")
             return res.returncode, res.stdout.strip(), res.stderr.strip()
-        except subprocess.TimeoutExpired:
-            raise WorkspaceError(f"Git command timed out after {timeout} seconds: {' '.join(args)}")
+        except subprocess.TimeoutExpired as e:
+            raise WorkspaceError(f"Git command timed out after {timeout} seconds: {' '.join(args)}") from e
 
     def get_workspace_path(self, repo: RepositoryRecord) -> Path:
         """Derive a safe filesystem path for the repository workspace."""
@@ -107,7 +106,7 @@ class WorkspaceManager:
             except Exception as e:
                 # Clean up failed partial clone directory safely
                 shutil.rmtree(target_dir, ignore_errors=True)
-                raise WorkspaceError(f"Failed to clone {repo.full_name}: {redact_secrets(str(e))}")
+                raise WorkspaceError(f"Failed to clone {repo.full_name}: {redact_secrets(str(e))}") from e
         else:
             logger.info("Reusing existing workspace for %s at %s", repo.full_name, target_dir)
             # Verify remote identity

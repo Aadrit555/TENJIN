@@ -1,6 +1,5 @@
 """Unit tests for change risk engine."""
 
-import pytest
 from tenjin.core.constants import RiskLevel
 from tenjin.policies.risk import evaluate_change_risk
 

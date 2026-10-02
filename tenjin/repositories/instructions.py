@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from tenjin.security.prompt_injection import sanitize_untrusted_content
 

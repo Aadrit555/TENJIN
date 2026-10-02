@@ -29,7 +29,6 @@ from tenjin.memory.models import (
     FindingRecord,
     GitActionRecord,
     HealthRecord,
-    MutationJournalRecord,
     RepositoryRecord,
     RunRecord,
     VerificationRunRecord,
@@ -37,7 +36,6 @@ from tenjin.memory.models import (
 from tenjin.notifications.desktop import send_desktop_notification
 from tenjin.orchestration.state_machine import RunStateMachine
 from tenjin.policies.policy import can_autofix_finding, resolve_effective_policy
-from tenjin.policies.risk import evaluate_change_risk
 from tenjin.reporting.report_generator import generate_json_report, generate_markdown_report
 from tenjin.repositories.instructions import extract_repository_instructions
 from tenjin.repositories.project_detection import detect_project_profile

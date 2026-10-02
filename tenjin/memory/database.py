@@ -25,6 +25,7 @@ from tenjin.memory.models import (
     RunRecord,
     SelectionDecisionRecord,
     StateTransitionRecord,
+    VerificationRunRecord,
 )
 
 SCHEMA_VERSION = 1

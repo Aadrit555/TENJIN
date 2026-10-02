@@ -8,15 +8,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 
-from tenjin.core.capabilities import CapabilityInventory, discover_capabilities
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from tenjin.core.capabilities import discover_capabilities
 from tenjin.core.config import TenjinConfig, load_config
 from tenjin.core.constants import FindingStatus
 from tenjin.core.lifecycle import ProcessLock
 from tenjin.memory.database import Database
-from tenjin.memory.models import FindingRecord, RepositoryRecord, RunRecord
 from tenjin.orchestration.scheduler import SchedulerState
 
 
