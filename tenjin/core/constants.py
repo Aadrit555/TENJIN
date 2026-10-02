@@ -99,3 +99,68 @@ class ToolStatus(str, Enum):
     AVAILABLE = "AVAILABLE"
     NOT_AVAILABLE = "NOT_AVAILABLE"
     NOT_CONFIGURED = "NOT_CONFIGURED"
+
+
+class ToolExecutionStatus(str, Enum):
+    """Execution status for security and quality tools."""
+    AVAILABLE = "AVAILABLE"
+    EXECUTED = "EXECUTED"
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class MissionType(str, Enum):
+    """Categories of engineering maintenance missions."""
+    BUG_REPAIR = "bug_repair"
+    SECURITY_REPAIR = "security_repair"
+    DEPENDENCY_MAINTENANCE = "dependency_maintenance"
+    TEST_REPAIR = "test_repair"
+    DOCUMENTATION_REPAIR = "documentation_repair"
+    REFACTOR = "refactor"
+    ARCHITECTURE_IMPROVEMENT = "architecture_improvement"
+    PROJECT_REVAMP = "project_revamp"
+    FULL_MAINTENANCE = "full_maintenance"
+
+
+class WorkClassification(str, Enum):
+    """Budget-aware work classification."""
+    FITS_TODAY = "fits_today"
+    TOO_LARGE_TODAY = "too_large_today"
+    BLOCKED = "blocked"
+    UNSAFE = "unsafe"
+    DEFERRED = "deferred"
+
+
+class DeferredStatus(str, Enum):
+    """Reason and lifecycle status for deferred maintenance work."""
+    DEFERRED_BUDGET = "deferred_budget"
+    DEFERRED_RISK = "deferred_risk"
+    DEFERRED_DEPENDENCY = "deferred_dependency"
+    BLOCKED = "blocked"
+    READY = "ready"
+
+
+class FindingResolution(str, Enum):
+    """Comparative finding status between baseline audit and post-fix audit."""
+    RESOLVED = "resolved"
+    UNCHANGED = "unchanged"
+    NEW = "new"
+    RECURRING = "recurring"
+
+
+class QuotaState(str, Enum):
+    """Real capacity knowledge state for agent model / context quotas."""
+    KNOWN = "KNOWN"
+    ESTIMATED = "ESTIMATED"
+    UNKNOWN = "UNKNOWN"
+
+
+class AccountMatchStatus(str, Enum):
+    """Antigravity worker account authentication match state."""
+    MATCHED = "MATCHED"
+    MISMATCHED = "MISMATCHED"
+    UNAUTHENTICATED = "UNAUTHENTICATED"
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+
