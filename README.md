@@ -1,14 +1,13 @@
 ```text
-  _______ ______ _   _      _ _____ _   _ 
- |__   __|  ____| \ | |    | |_   _| \ | |
-    | |  | |__  |  \| |    | | | | |  \| |
-    | |  |  __| | . ` |_   | | | | | . ` |
-    | |  | |____| |\  | |__| |_| |_| |\  |
-    |_|  |______|_| \_|\____/|_____|_| \_|
+ ███████████ ██████████ ██████   █████       █████ █████ ██████   █████
+░█░░░███░░░█░░███░░░░░█░░██████ ░░███       ░░███ ░░███ ░░██████ ░░███ 
+░   ░███  ░  ░███  █ ░  ░███░███ ░███        ░███  ░███  ░███░███ ░███ 
+    ░███     ░██████    ░███░░███░███        ░███  ░███  ░███░░███░███ 
+    ░███     ░███░░█    ░███ ░░██████        ░███  ░███  ░███ ░░██████ 
+    ░███     ░███ ░   █ ░███  ░░█████  ███   ░███  ░███  ░███  ░░█████ 
+    █████    ██████████ █████  ░░█████░░████████   █████ █████  ░░█████
+   ░░░░░    ░░░░░░░░░░ ░░░░░    ░░░░░  ░░░░░░░░   ░░░░░ ░░░░░    ░░░░░ 
 ```
-
-# TENJIN
-### AUTONOMOUS SOFTWARE-ENGINEERING AGENT
 
 A local autonomous software-engineering system that watches your GitHub repositories, identifies code needing maintenance, audits repositories for real issues, delegates fixes to Antigravity, independently verifies modifications, and commits verified work.
 
