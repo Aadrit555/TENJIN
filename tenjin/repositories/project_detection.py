@@ -7,6 +7,7 @@ to detect applicable test, lint, type-check, and build commands without guessing
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -14,6 +15,8 @@ from typing import List, Optional
 import yaml
 
 from tenjin.core.capabilities import CapabilityInventory
+
+logger = logging.getLogger("tenjin.repositories.project_detection")
 
 
 @dataclass
