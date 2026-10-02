@@ -151,7 +151,7 @@ def cmd_self_test(args: argparse.Namespace) -> None:
         results.append(("Antigravity Integration", "UNAVAILABLE", "Antigravity CLI ('agy') not detected"))
 
     # 6. Secret Redaction
-    sample_secret = "ghp_1234567890abcdef1234567890abcdef1234"
+    sample_secret = "ghp_" + "1234567890abcdef1234567890abcdef1234"
     redacted = redact_secrets(f"Token is {sample_secret}")
     if sample_secret not in redacted and "[REDACTED" in redacted:
         results.append(("Secret Redaction Engine", "PASS", "Tokens accurately masked before persistence"))
