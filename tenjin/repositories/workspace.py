@@ -123,8 +123,11 @@ class WorkspaceManager:
                     f"Workspace {target_dir} has uncommitted human changes. Halting to avoid data loss."
                 )
 
-            # Fetch latest commits safely
+            # Fetch and fast-forward latest commits safely
             self._run_git(target_dir, ["fetch", "origin"])
+            def_branch = repo.default_branch or "main"
+            self._run_git(target_dir, ["checkout", def_branch], check=False)
+            self._run_git(target_dir, ["merge", "--ff-only", f"origin/{def_branch}"], check=False)
 
         # Determine current branch
         _, branch_out, _ = self._run_git(target_dir, ["rev-parse", "--abbrev-ref", "HEAD"])
