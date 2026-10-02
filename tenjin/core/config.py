@@ -55,9 +55,41 @@ class TimeoutConfig(BaseModel):
     test_timeout_seconds: int = Field(default=240)
 
 
+DEFAULT_MANAGED_REPOSITORIES: List[str] = [
+    "Aadrit555/DidSomethinSLM",
+    "Aadrit555/Mimiq2",
+    "Aadrit555/Little-Garden",
+    "Aadrit555/Ai-Sports-Analyzer",
+    "Aadrit555/im-an_IDIOT",
+    "Aadrit555/Attendance-Calculator",
+    "Aadrit555/AETHER",
+    "Aadrit555/Hacka1",
+    "Aadrit555/Pokemon-First-Ever",
+    "Aadrit555/Bus-Reservation-SystemC",
+    "Aadrit555/DidSomethinAgain",
+]
+
+
+class BudgetConfig(BaseModel):
+    """Context, token, and reasoning budget management."""
+    context_budget_tokens: int = Field(default=200000, description="Conservative model context window budget")
+    verification_reserve_ratio: float = Field(default=0.25, description="Ratio of budget strictly reserved for verification and re-audit")
+    recovery_margin_ratio: float = Field(default=0.15, description="Ratio of budget reserved for error recovery")
+    max_estimated_cost_per_mission: int = Field(default=150000, description="Max estimated complexity cost permitted in a single mission")
+
+
+class DailyScheduleConfig(BaseModel):
+    """Daily mission scheduler settings."""
+    enabled: bool = Field(default=True, description="Enable daily maintenance cycle")
+    schedule_time: str = Field(default="02:00", description="Daily execution time in HH:MM (24-hour)")
+    selection_strategy: str = Field(default="random", description="'random' (uniform random across eligible managed repos) or 'weighted'")
+
+
 class SafetyPolicyConfig(BaseModel):
     """Global safety boundaries and auto-fix permissions."""
     autonomy_level: AutonomyLevel = Field(default=AutonomyLevel.LEVEL_1_AUDIT_REPORT)
+    deletion_guard_enabled: bool = Field(default=True, description="Strictly prohibit permanent deletion of existing tracked files")
+    allow_major_revamps: bool = Field(default=True, description="Authorize substantial rewrites and major project revamps within managed workspace")
     protected_paths: List[str] = Field(
         default_factory=lambda: [
             ".github/workflows/**",
@@ -80,11 +112,11 @@ class SafetyPolicyConfig(BaseModel):
         ]
     )
     allowed_severities_for_autofix: List[str] = Field(
-        default_factory=lambda: ["medium", "low", "informational"]
+        default_factory=lambda: ["critical", "high", "medium", "low", "informational"]
     )
-    require_human_approval_for_high_risk: bool = Field(default=True)
-    max_files_changed_for_autofix: int = Field(default=5)
-    max_lines_changed_for_autofix: int = Field(default=150)
+    require_human_approval_for_high_risk: bool = Field(default=False)
+    max_files_changed_for_autofix: int = Field(default=1000, description="Broad engineering authority without arbitrary tiny limits")
+    max_lines_changed_for_autofix: int = Field(default=50000, description="Broad engineering authority without arbitrary tiny limits")
     auto_push_branch: bool = Field(default=False)
     auto_create_pr: bool = Field(default=False)
     auto_merge: bool = Field(default=False)
@@ -117,14 +149,30 @@ class TenjinConfig(BaseModel):
     database_path: str = Field(default="", description="Path to SQLite database")
     reports_dir: str = Field(default="", description="Path to generated reports directory")
     logs_dir: str = Field(default="", description="Path to logs directory")
+    managed_repositories: List[str] = Field(
+        default_factory=lambda: list(DEFAULT_MANAGED_REPOSITORIES),
+        description="Authoritative allowlist of repositories authorized for autonomous mutation"
+    )
+    antigravity_expected_account: str = Field(
+        default="jhonbailey456@gmail.com",
+        description="Expected Antigravity account identity for autonomous worker"
+    )
+    antigravity_cli_path: Optional[str] = Field(default=None, description="Discovered or configured path to agy CLI")
     github: GitHubConfig = Field(default_factory=GitHubConfig)
     selection: SelectionWeightsConfig = Field(default_factory=SelectionWeightsConfig)
+    daily_schedule: DailyScheduleConfig = Field(default_factory=DailyScheduleConfig)
+    budget: BudgetConfig = Field(default_factory=BudgetConfig)
     concurrency: ConcurrencyConfig = Field(default_factory=ConcurrencyConfig)
     timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
     safety: SafetyPolicyConfig = Field(default_factory=SafetyPolicyConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     notifications: NotificationConfig = Field(default_factory=NotificationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+    def is_repository_managed(self, full_name: str) -> bool:
+        """Check if a repository is explicitly authorized in the managed allowlist."""
+        normalized = full_name.strip().lower()
+        return any(managed.strip().lower() == normalized for managed in self.managed_repositories)
 
     def sanitized_dict(self) -> Dict[str, Any]:
         """Return configuration dictionary with all secrets and credentials stripped."""
@@ -201,6 +249,14 @@ def load_config(config_path: Optional[str | Path] = None) -> TenjinConfig:
     env_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if env_token:
         cfg.github.token = env_token
+
+    env_account = os.environ.get("ANTIGRAVITY_EXPECTED_ACCOUNT") or os.environ.get("ANTIGRAVITY_ACCOUNT")
+    if env_account:
+        cfg.antigravity_expected_account = env_account
+
+    env_agy_cli = os.environ.get("ANTIGRAVITY_CLI_PATH") or os.environ.get("AGY_PATH")
+    if env_agy_cli:
+        cfg.antigravity_cli_path = env_agy_cli
 
     return cfg
 
