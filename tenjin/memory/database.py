@@ -13,9 +13,23 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
-from tenjin.core.constants import FindingSeverity, FindingSource, FindingStatus, RiskLevel, State
+from tenjin.core.constants import (
+    DeferredStatus,
+    FindingResolution,
+    FindingSeverity,
+    FindingSource,
+    FindingStatus,
+    MissionType,
+    RiskLevel,
+    State,
+)
 from tenjin.memory.models import (
     AgentExecutionRecord,
+    BaselineManifestRecord,
+    DailyMissionRecord,
+    DeferredTaskRecord,
+    DeletionViolationRecord,
+    DiffFreezeRecord,
     FindingHistoryRecord,
     FindingRecord,
     GitActionRecord,
@@ -28,7 +42,7 @@ from tenjin.memory.models import (
     VerificationRunRecord,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 INIT_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -43,6 +57,7 @@ CREATE TABLE IF NOT EXISTS repositories (
     url TEXT NOT NULL,
     clone_url TEXT NOT NULL,
     default_branch TEXT NOT NULL DEFAULT 'main',
+    is_managed INTEGER NOT NULL DEFAULT 0,
     is_private INTEGER NOT NULL DEFAULT 0,
     is_fork INTEGER NOT NULL DEFAULT 0,
     is_archived INTEGER NOT NULL DEFAULT 0,
@@ -203,6 +218,82 @@ CREATE TABLE IF NOT EXISTS mutation_journal (
     timestamp TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS daily_missions (
+    mission_id TEXT PRIMARY KEY,
+    repository TEXT NOT NULL,
+    mission_date TEXT NOT NULL,
+    mission_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    base_sha TEXT,
+    head_sha TEXT,
+    estimated_cost INTEGER NOT NULL DEFAULT 0,
+    budget_allocated INTEGER NOT NULL DEFAULT 0,
+    findings_targeted_json TEXT NOT NULL DEFAULT '[]',
+    findings_resolved_json TEXT NOT NULL DEFAULT '[]',
+    findings_unchanged_json TEXT NOT NULL DEFAULT '[]',
+    findings_new_json TEXT NOT NULL DEFAULT '[]',
+    deletion_guard_passed INTEGER NOT NULL DEFAULT 1,
+    verified_diff_hash TEXT,
+    commit_sha TEXT,
+    branch_pushed TEXT,
+    pr_url TEXT,
+    summary TEXT,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    error_message TEXT,
+    FOREIGN KEY (repository) REFERENCES repositories(full_name) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS deferred_tasks (
+    id TEXT PRIMARY KEY,
+    repository TEXT NOT NULL,
+    mission_id TEXT NOT NULL,
+    finding_ids_json TEXT NOT NULL DEFAULT '[]',
+    title TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    proposed_plan TEXT NOT NULL,
+    affected_files_json TEXT NOT NULL DEFAULT '[]',
+    estimated_cost INTEGER NOT NULL DEFAULT 0,
+    reason_for_deferral TEXT NOT NULL,
+    status TEXT NOT NULL,
+    attempts_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (repository) REFERENCES repositories(full_name) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS baseline_manifests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    repository TEXT NOT NULL,
+    base_sha TEXT NOT NULL,
+    tracked_files_json TEXT NOT NULL,
+    file_hashes_json TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS deletion_violations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    repository TEXT NOT NULL,
+    deleted_file TEXT NOT NULL,
+    restored INTEGER NOT NULL DEFAULT 0,
+    detected_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS diff_freezes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    repository TEXT NOT NULL,
+    verified_diff_hash TEXT NOT NULL,
+    pre_commit_diff_hash TEXT NOT NULL,
+    is_match INTEGER NOT NULL,
+    frozen_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_findings_fingerprint ON findings(fingerprint);
 CREATE INDEX IF NOT EXISTS idx_findings_repo ON findings(repository);
 CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(status);
@@ -210,6 +301,13 @@ CREATE INDEX IF NOT EXISTS idx_runs_repo ON runs(repository);
 CREATE INDEX IF NOT EXISTS idx_runs_state ON runs(state);
 CREATE INDEX IF NOT EXISTS idx_state_transitions_run ON state_transitions(run_id);
 CREATE INDEX IF NOT EXISTS idx_health_repo ON health_records(repository);
+CREATE INDEX IF NOT EXISTS idx_daily_missions_date ON daily_missions(mission_date);
+CREATE INDEX IF NOT EXISTS idx_daily_missions_repo ON daily_missions(repository);
+CREATE INDEX IF NOT EXISTS idx_deferred_tasks_repo ON deferred_tasks(repository);
+CREATE INDEX IF NOT EXISTS idx_deferred_tasks_status ON deferred_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_baseline_manifests_run ON baseline_manifests(run_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_violations_run ON deletion_violations(run_id);
+CREATE INDEX IF NOT EXISTS idx_diff_freezes_run ON diff_freezes(run_id);
 """
 
 
@@ -247,6 +345,12 @@ class Database:
         """Apply base schema and track migrations."""
         with self.connection() as conn:
             conn.executescript(INIT_SCHEMA_SQL)
+            # Migration check: ensure is_managed column exists in repositories
+            cur = conn.execute("PRAGMA table_info(repositories)")
+            cols = [row[1] for row in cur.fetchall()]
+            if "is_managed" not in cols:
+                conn.execute("ALTER TABLE repositories ADD COLUMN is_managed INTEGER NOT NULL DEFAULT 0")
+
             cur = conn.execute("SELECT version FROM schema_migrations WHERE version = ?", (SCHEMA_VERSION,))
             if not cur.fetchone():
                 import datetime
@@ -260,16 +364,17 @@ class Database:
         """Insert or update a repository record."""
         sql = """
         INSERT INTO repositories (
-            full_name, owner, name, url, clone_url, default_branch, is_private,
+            full_name, owner, name, url, clone_url, default_branch, is_managed, is_private,
             is_fork, is_archived, language, topics_json, permissions_json,
             last_audit_at, health_score, status, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(full_name) DO UPDATE SET
             owner = excluded.owner,
             name = excluded.name,
             url = excluded.url,
             clone_url = excluded.clone_url,
             default_branch = excluded.default_branch,
+            is_managed = excluded.is_managed,
             is_private = excluded.is_private,
             is_fork = excluded.is_fork,
             is_archived = excluded.is_archived,
@@ -291,6 +396,7 @@ class Database:
                     repo.url,
                     repo.clone_url,
                     repo.default_branch,
+                    1 if repo.is_managed else 0,
                     1 if repo.is_private else 0,
                     1 if repo.is_fork else 0,
                     1 if repo.is_archived else 0,
@@ -304,6 +410,19 @@ class Database:
                 ),
             )
 
+    def set_repository_managed(self, full_name: str, is_managed: bool) -> None:
+        """Mark a repository as explicitly managed or unmanaged."""
+        sql = "UPDATE repositories SET is_managed = ? WHERE full_name = ?"
+        with self.connection() as conn:
+            conn.execute(sql, (1 if is_managed else 0, full_name))
+
+    def list_managed_repositories(self) -> List[RepositoryRecord]:
+        """List all repositories authorized in the managed allowlist."""
+        sql = "SELECT * FROM repositories WHERE is_managed = 1 ORDER BY full_name ASC"
+        with self.connection() as conn:
+            rows = conn.execute(sql).fetchall()
+            return [self._row_to_repo(r) for r in rows]
+
     def get_repository(self, full_name: str) -> Optional[RepositoryRecord]:
         """Fetch a single repository by full_name."""
         sql = "SELECT * FROM repositories WHERE full_name = ?"
@@ -315,12 +434,13 @@ class Database:
 
     def list_repositories(self) -> List[RepositoryRecord]:
         """List all discovered repositories."""
-        sql = "SELECT * FROM repositories ORDER BY health_score ASC, full_name ASC"
+        sql = "SELECT * FROM repositories ORDER BY is_managed DESC, health_score ASC, full_name ASC"
         with self.connection() as conn:
             rows = conn.execute(sql).fetchall()
             return [self._row_to_repo(r) for r in rows]
 
     def _row_to_repo(self, row: sqlite3.Row) -> RepositoryRecord:
+        keys = row.keys()
         return RepositoryRecord(
             full_name=row["full_name"],
             owner=row["owner"],
@@ -328,6 +448,7 @@ class Database:
             url=row["url"],
             clone_url=row["clone_url"],
             default_branch=row["default_branch"],
+            is_managed=bool(row["is_managed"]) if "is_managed" in keys else False,
             is_private=bool(row["is_private"]),
             is_fork=bool(row["is_fork"]),
             is_archived=bool(row["is_archived"]),
@@ -809,7 +930,10 @@ class Database:
         """Calculate live system statistics for dashboard and CLI."""
         with self.connection() as conn:
             repo_count = conn.execute("SELECT count(*) as c FROM repositories").fetchone()["c"]
+            managed_count = conn.execute("SELECT count(*) as c FROM repositories WHERE is_managed = 1").fetchone()["c"]
             run_count = conn.execute("SELECT count(*) as c FROM runs").fetchone()["c"]
+            mission_count = conn.execute("SELECT count(*) as c FROM daily_missions").fetchone()["c"]
+            deferred_count = conn.execute("SELECT count(*) as c FROM deferred_tasks WHERE status != 'ready'").fetchone()["c"]
             open_findings = conn.execute(
                 "SELECT count(*) as c FROM findings WHERE status = 'open'"
             ).fetchone()["c"]
@@ -840,6 +964,9 @@ class Database:
 
             return {
                 "repositories_count": repo_count,
+                "managed_repositories_count": managed_count,
+                "daily_missions_count": mission_count,
+                "deferred_tasks_count": deferred_count,
                 "total_runs": run_count,
                 "open_findings": open_findings,
                 "critical_findings": critical_count,
@@ -851,3 +978,379 @@ class Database:
                 "pushes_completed": push_count,
                 "prs_opened": pr_count,
             }
+
+    # Daily Mission operations
+    def create_daily_mission(self, mission: DailyMissionRecord) -> None:
+        """Record a planned or active daily maintenance mission."""
+        sql = """
+        INSERT INTO daily_missions (
+            mission_id, repository, mission_date, mission_type, status,
+            base_sha, head_sha, estimated_cost, budget_allocated,
+            findings_targeted_json, findings_resolved_json, findings_unchanged_json,
+            findings_new_json, deletion_guard_passed, verified_diff_hash,
+            commit_sha, branch_pushed, pr_url, summary, started_at, ended_at, error_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    mission.mission_id,
+                    mission.repository,
+                    mission.mission_date,
+                    mission.mission_type.value if hasattr(mission.mission_type, "value") else str(mission.mission_type),
+                    mission.status,
+                    mission.base_sha,
+                    mission.head_sha,
+                    mission.estimated_cost,
+                    mission.budget_allocated,
+                    json.dumps(mission.findings_targeted),
+                    json.dumps(mission.findings_resolved),
+                    json.dumps(mission.findings_unchanged),
+                    json.dumps(mission.findings_new),
+                    1 if mission.deletion_guard_passed else 0,
+                    mission.verified_diff_hash,
+                    mission.commit_sha,
+                    mission.branch_pushed,
+                    mission.pr_url,
+                    mission.summary,
+                    mission.started_at,
+                    mission.ended_at,
+                    mission.error_message,
+                ),
+            )
+
+    def update_daily_mission(self, mission: DailyMissionRecord) -> None:
+        """Update an existing daily maintenance mission record."""
+        sql = """
+        UPDATE daily_missions SET
+            status = ?,
+            head_sha = ?,
+            findings_resolved_json = ?,
+            findings_unchanged_json = ?,
+            findings_new_json = ?,
+            deletion_guard_passed = ?,
+            verified_diff_hash = ?,
+            commit_sha = ?,
+            branch_pushed = ?,
+            pr_url = ?,
+            summary = ?,
+            ended_at = ?,
+            error_message = ?
+        WHERE mission_id = ?
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    mission.status,
+                    mission.head_sha,
+                    json.dumps(mission.findings_resolved),
+                    json.dumps(mission.findings_unchanged),
+                    json.dumps(mission.findings_new),
+                    1 if mission.deletion_guard_passed else 0,
+                    mission.verified_diff_hash,
+                    mission.commit_sha,
+                    mission.branch_pushed,
+                    mission.pr_url,
+                    mission.summary,
+                    mission.ended_at,
+                    mission.error_message,
+                    mission.mission_id,
+                ),
+            )
+
+    def get_daily_mission(self, mission_id: str) -> Optional[DailyMissionRecord]:
+        """Fetch a daily mission by its unique ID."""
+        sql = "SELECT * FROM daily_missions WHERE mission_id = ?"
+        with self.connection() as conn:
+            row = conn.execute(sql, (mission_id,)).fetchone()
+            return self._row_to_daily_mission(row) if row else None
+
+    def get_daily_mission_by_date(self, mission_date: str) -> Optional[DailyMissionRecord]:
+        """Fetch the daily mission recorded for a specific date (YYYY-MM-DD)."""
+        sql = "SELECT * FROM daily_missions WHERE mission_date = ? ORDER BY started_at DESC LIMIT 1"
+        with self.connection() as conn:
+            row = conn.execute(sql, (mission_date,)).fetchone()
+            return self._row_to_daily_mission(row) if row else None
+
+    def list_daily_missions(self, limit: int = 50) -> List[DailyMissionRecord]:
+        """List recent daily missions ordered by start time descending."""
+        sql = "SELECT * FROM daily_missions ORDER BY started_at DESC LIMIT ?"
+        with self.connection() as conn:
+            rows = conn.execute(sql, (limit,)).fetchall()
+            return [self._row_to_daily_mission(r) for r in rows]
+
+    def _row_to_daily_mission(self, row: sqlite3.Row) -> DailyMissionRecord:
+        return DailyMissionRecord(
+            mission_id=row["mission_id"],
+            repository=row["repository"],
+            mission_date=row["mission_date"],
+            mission_type=MissionType(row["mission_type"]),
+            status=row["status"],
+            base_sha=row["base_sha"],
+            head_sha=row["head_sha"],
+            estimated_cost=row["estimated_cost"],
+            budget_allocated=row["budget_allocated"],
+            findings_targeted=json.loads(row["findings_targeted_json"] or "[]"),
+            findings_resolved=json.loads(row["findings_resolved_json"] or "[]"),
+            findings_unchanged=json.loads(row["findings_unchanged_json"] or "[]"),
+            findings_new=json.loads(row["findings_new_json"] or "[]"),
+            deletion_guard_passed=bool(row["deletion_guard_passed"]),
+            verified_diff_hash=row["verified_diff_hash"],
+            commit_sha=row["commit_sha"],
+            branch_pushed=row["branch_pushed"],
+            pr_url=row["pr_url"],
+            summary=row["summary"],
+            started_at=row["started_at"],
+            ended_at=row["ended_at"],
+            error_message=row["error_message"],
+        )
+
+    # Deferred Task operations
+    def create_deferred_task(self, task: DeferredTaskRecord) -> None:
+        """Insert a deferred maintenance task."""
+        sql = """
+        INSERT INTO deferred_tasks (
+            id, repository, mission_id, finding_ids_json, title, evidence,
+            proposed_plan, affected_files_json, estimated_cost, reason_for_deferral,
+            status, attempts_count, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    task.id,
+                    task.repository,
+                    task.mission_id,
+                    json.dumps(task.finding_ids),
+                    task.title,
+                    task.evidence,
+                    task.proposed_plan,
+                    json.dumps(task.affected_files),
+                    task.estimated_cost,
+                    task.reason_for_deferral,
+                    task.status.value if hasattr(task.status, "value") else str(task.status),
+                    task.attempts_count,
+                    task.created_at,
+                    task.updated_at,
+                ),
+            )
+
+    def update_deferred_task(self, task: DeferredTaskRecord) -> None:
+        """Update an existing deferred maintenance task."""
+        sql = """
+        UPDATE deferred_tasks SET
+            status = ?,
+            attempts_count = ?,
+            updated_at = ?
+        WHERE id = ?
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    task.status.value if hasattr(task.status, "value") else str(task.status),
+                    task.attempts_count,
+                    task.updated_at,
+                    task.id,
+                ),
+            )
+
+    def get_deferred_task(self, task_id: str) -> Optional[DeferredTaskRecord]:
+        """Fetch a deferred task by ID."""
+        sql = "SELECT * FROM deferred_tasks WHERE id = ?"
+        with self.connection() as conn:
+            row = conn.execute(sql, (task_id,)).fetchone()
+            return self._row_to_deferred_task(row) if row else None
+
+    def list_deferred_tasks(
+        self, repository: Optional[str] = None, status: Optional[str] = None
+    ) -> List[DeferredTaskRecord]:
+        """List deferred tasks with optional repository and status filtering."""
+        sql = "SELECT * FROM deferred_tasks WHERE 1=1"
+        params: List[Any] = []
+        if repository:
+            sql += " AND repository = ?"
+            params.append(repository)
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
+        sql += " ORDER BY created_at DESC"
+
+        with self.connection() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+            return [self._row_to_deferred_task(r) for r in rows]
+
+    def _row_to_deferred_task(self, row: sqlite3.Row) -> DeferredTaskRecord:
+        return DeferredTaskRecord(
+            id=row["id"],
+            repository=row["repository"],
+            mission_id=row["mission_id"],
+            finding_ids=json.loads(row["finding_ids_json"] or "[]"),
+            title=row["title"],
+            evidence=row["evidence"],
+            proposed_plan=row["proposed_plan"],
+            affected_files=json.loads(row["affected_files_json"] or "[]"),
+            estimated_cost=row["estimated_cost"],
+            reason_for_deferral=row["reason_for_deferral"],
+            status=DeferredStatus(row["status"]),
+            attempts_count=row["attempts_count"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    # Baseline Manifest operations
+    def create_baseline_manifest(self, manifest: BaselineManifestRecord) -> None:
+        """Persist tracked-file baseline manifest before mutations begin."""
+        sql = """
+        INSERT INTO baseline_manifests (
+            run_id, repository, base_sha, tracked_files_json, file_hashes_json, captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    manifest.run_id,
+                    manifest.repository,
+                    manifest.base_sha,
+                    json.dumps(manifest.tracked_files),
+                    json.dumps(manifest.file_hashes),
+                    manifest.captured_at,
+                ),
+            )
+
+    def get_baseline_manifest(self, run_id: str) -> Optional[BaselineManifestRecord]:
+        """Retrieve baseline manifest recorded for a run."""
+        sql = "SELECT * FROM baseline_manifests WHERE run_id = ?"
+        with self.connection() as conn:
+            row = conn.execute(sql, (run_id,)).fetchone()
+            if not row:
+                return None
+            return BaselineManifestRecord(
+                id=row["id"],
+                run_id=row["run_id"],
+                repository=row["repository"],
+                base_sha=row["base_sha"],
+                tracked_files=json.loads(row["tracked_files_json"] or "[]"),
+                file_hashes=json.loads(row["file_hashes_json"] or "{}"),
+                captured_at=row["captured_at"],
+            )
+
+    # Deletion Violation operations
+    def record_deletion_violation(self, violation: DeletionViolationRecord) -> None:
+        """Log an attempted permanent deletion of an existing tracked file."""
+        sql = """
+        INSERT INTO deletion_violations (
+            run_id, repository, deleted_file, restored, detected_at
+        ) VALUES (?, ?, ?, ?, ?)
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    violation.run_id,
+                    violation.repository,
+                    violation.deleted_file,
+                    1 if violation.restored else 0,
+                    violation.detected_at,
+                ),
+            )
+
+    def list_deletion_violations(self, run_id: Optional[str] = None) -> List[DeletionViolationRecord]:
+        """List deletion violations."""
+        sql = "SELECT * FROM deletion_violations"
+        params: List[Any] = []
+        if run_id:
+            sql += " WHERE run_id = ?"
+            params.append(run_id)
+        sql += " ORDER BY detected_at DESC"
+
+        with self.connection() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+            return [
+                DeletionViolationRecord(
+                    id=r["id"],
+                    run_id=r["run_id"],
+                    repository=r["repository"],
+                    deleted_file=r["deleted_file"],
+                    restored=bool(r["restored"]),
+                    detected_at=r["detected_at"],
+                )
+                for r in rows
+            ]
+
+    # Diff Freeze operations
+    def record_diff_freeze(self, freeze: DiffFreezeRecord) -> None:
+        """Record verified diff freeze validation result."""
+        sql = """
+        INSERT INTO diff_freezes (
+            run_id, repository, verified_diff_hash, pre_commit_diff_hash, is_match, frozen_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+        with self.connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    freeze.run_id,
+                    freeze.repository,
+                    freeze.verified_diff_hash,
+                    freeze.pre_commit_diff_hash,
+                    1 if freeze.is_match else 0,
+                    freeze.frozen_at,
+                ),
+            )
+
+    def get_diff_freeze(self, run_id: str) -> Optional[DiffFreezeRecord]:
+        """Fetch the latest diff freeze record for a run."""
+        sql = "SELECT * FROM diff_freezes WHERE run_id = ? ORDER BY id DESC LIMIT 1"
+        with self.connection() as conn:
+            row = conn.execute(sql, (run_id,)).fetchone()
+            if not row:
+                return None
+            return DiffFreezeRecord(
+                id=row["id"],
+                run_id=row["run_id"],
+                repository=row["repository"],
+                verified_diff_hash=row["verified_diff_hash"],
+                pre_commit_diff_hash=row["pre_commit_diff_hash"],
+                is_match=bool(row["is_match"]),
+                frozen_at=row["frozen_at"],
+            )
+
+    # SQLite Online Backup and Verification
+    def backup_database(self, destination_path: str | Path) -> Path:
+        """Perform a real online atomic SQLite backup using sqlite3.Connection.backup."""
+        dest = Path(destination_path).resolve()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        # Use a raw connection to ensure proper lock acquisition
+        src_conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        try:
+            dest_conn = sqlite3.connect(str(dest))
+            try:
+                src_conn.backup(dest_conn)
+            finally:
+                dest_conn.close()
+        finally:
+            src_conn.close()
+        return dest
+
+    def verify_backup_integrity(self, backup_path: str | Path) -> bool:
+        """Verify the integrity of a database backup via PRAGMA integrity_check."""
+        p = Path(backup_path)
+        if not p.is_file():
+            return False
+        try:
+            conn = sqlite3.connect(str(p), timeout=10.0)
+            try:
+                cur = conn.cursor()
+                cur.execute("PRAGMA integrity_check;")
+                row = cur.fetchone()
+                return row is not None and row[0] == "ok"
+            finally:
+                conn.close()
+        except Exception:
+            return False
+
