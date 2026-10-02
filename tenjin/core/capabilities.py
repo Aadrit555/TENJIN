@@ -280,6 +280,10 @@ def discover_capabilities() -> CapabilityInventory:
         str(home / "AppData" / "Local" / "Programs" / "DockerDesktop" / "resources" / "bin"),
         str(home / ".gemini" / "bin"),
     ]
+    # Add active virtual environment scripts directory if running in venv
+    venv_scripts = Path(sys.prefix) / ("Scripts" if platform.system() == "Windows" else "bin")
+    if venv_scripts.is_dir():
+        extra_search_dirs.insert(0, str(venv_scripts))
 
     # Git
     git_path = _find_executable("git")
