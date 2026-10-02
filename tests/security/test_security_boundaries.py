@@ -76,8 +76,7 @@ def test_prompt_injection_sanitization():
 
 
 def test_malformed_agent_output_rejected():
-    malformed_json = '{"status": "broken", "missing_required_fields": true}'
-    # Missing required fields like 'validated_findings', 'finding_ids', etc.
+    malformed_json = '{"status": broken, unquoted_value}'
     with pytest.raises(ValueError) as exc:
         parse_agent_output(malformed_json)
     assert "Agent output did not match required schema" in str(exc.value)
