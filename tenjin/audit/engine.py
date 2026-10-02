@@ -203,8 +203,8 @@ class AuditEngine:
                                     fingerprint=fp,
                                 )
                             )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to parse individual ruff diagnostic item: %s", e)
             except Exception as e:
                 logger.warning("Deterministic ruff audit failed: %s", e)
 
