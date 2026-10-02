@@ -26,6 +26,11 @@ def test_fingerprint_stability_across_minor_whitespace():
 
 
 def test_regression_promotion_fixed_to_recurring(temp_db):
+    from tenjin.memory.models import RepositoryRecord
+    temp_db.upsert_repository(RepositoryRecord(
+        full_name="owner/repo", owner="owner", name="repo",
+        url="https://github.com/owner/repo", clone_url="https://github.com/owner/repo.git"
+    ))
     run1 = RunRecord(run_id="run_1", repository="owner/repo")
     temp_db.create_run(run1)
 
