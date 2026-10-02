@@ -266,8 +266,8 @@ def discover_hardware() -> HardwareResources:
                 pages = sysconf_fn("SC_PHYS_PAGES")
                 page_size = sysconf_fn("SC_PAGE_SIZE")
                 res.total_memory_gb = round((pages * page_size) / (1024 ** 3), 2)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to determine hardware memory: %s", e)
 
     return res
 
