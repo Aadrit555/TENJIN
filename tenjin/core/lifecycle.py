@@ -37,8 +37,8 @@ class ProcessLock:
                     # Check if process is actually alive
                     if self._is_pid_alive(pid):
                         return False
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to inspect existing PID file: %s", e)
 
         # Write current PID
         try:
