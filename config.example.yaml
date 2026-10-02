@@ -1,0 +1,78 @@
+# TENJIN Example Configuration File
+# Note: Paths left blank will be dynamically resolved relative to the runtime directory.
+# Secrets and tokens should never be stored directly in this file.
+
+workspace_dir: ""
+database_path: ""
+reports_dir: ""
+logs_dir: ""
+
+github:
+  token: null # Or set via GITHUB_TOKEN environment variable / gh auth login
+  include_private: true
+  include_forks: false
+  excluded_repositories: []
+  included_topics: []
+  rate_limit_threshold: 50
+
+selection:
+  stale_audit_weight: 0.35
+  activity_weight: 0.25
+  unresolved_findings_weight: 0.25
+  exploration_weight: 0.15
+  cooldown_hours: 4.0
+  starvation_threshold_hours: 48.0
+
+concurrency:
+  max_parallel_repositories: 1
+  max_repair_attempts_per_run: 3
+  max_attempts_per_finding: 2
+
+timeouts:
+  git_timeout_seconds: 120
+  scanner_timeout_seconds: 180
+  agent_timeout_seconds: 300
+  test_timeout_seconds: 240
+
+safety:
+  autonomy_level: 1 # 0: Observe, 1: Audit+Report (Default), 2: Propose, 3: Commit, 4: Push, 5: PR, 6: Merge
+  protected_paths:
+    - ".github/workflows/**"
+    - "credentials/**"
+    - "secrets/**"
+    - "*.pem"
+    - "*.key"
+    - "*.env*"
+  excluded_paths:
+    - "node_modules/**"
+    - "vendor/**"
+    - "dist/**"
+    - "build/**"
+    - ".venv/**"
+    - "__pycache__/**"
+    - ".git/**"
+  allowed_severities_for_autofix:
+    - "medium"
+    - "low"
+    - "informational"
+  require_human_approval_for_high_risk: true
+  max_files_changed_for_autofix: 5
+  max_lines_changed_for_autofix: 150
+  auto_push_branch: false
+  auto_create_pr: false
+  auto_merge: false
+
+dashboard:
+  host: "127.0.0.1"
+  port: 8765
+  enabled: true
+
+notifications:
+  desktop_enabled: true
+  sound_enabled: false
+
+logging:
+  level: "INFO"
+  json_format: false
+  max_bytes: 10485760
+  backup_count: 5
