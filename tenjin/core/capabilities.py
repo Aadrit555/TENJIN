@@ -261,9 +261,10 @@ def discover_hardware() -> HardwareResources:
                 res.free_memory_gb = round(stat.ullAvailPhys / (1024 ** 3), 2)
         else:
             # POSIX memory fallback via sysconf if available
-            if hasattr(os, "sysconf"):
-                pages = getattr(os, "sysconf")("SC_PHYS_PAGES")
-                page_size = getattr(os, "sysconf")("SC_PAGE_SIZE")
+            sysconf_fn = getattr(os, "sysconf", None)
+            if callable(sysconf_fn):
+                pages = sysconf_fn("SC_PHYS_PAGES")
+                page_size = sysconf_fn("SC_PAGE_SIZE")
                 res.total_memory_gb = round((pages * page_size) / (1024 ** 3), 2)
     except Exception:
         pass
