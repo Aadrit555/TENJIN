@@ -20,7 +20,7 @@ from tenjin.agents.output_parser import (
     get_agent_output_json_schema,
     parse_agent_output,
 )
-from tenjin.core.capabilities import _find_executable
+from tenjin.core.capabilities import _find_executable, discover_antigravity
 from tenjin.security.isolation import get_sanitized_environment
 from tenjin.security.redaction import redact_secrets
 
@@ -35,7 +35,12 @@ class AntigravityInvocationError(Exception):
 class AntigravityRunner:
     """Executes the local Antigravity agent against an isolated workspace."""
 
-    def __init__(self, cli_path: Optional[str] = None, timeout_seconds: float = 300.0):
+    def __init__(
+        self,
+        cli_path: Optional[str] = None,
+        timeout_seconds: float = 300.0,
+        expected_account: str = "jhonbailey456@gmail.com",
+    ):
         home = Path.home()
         extra_dirs = [
             str(home / ".gemini" / "bin"),
@@ -44,6 +49,7 @@ class AntigravityRunner:
         ]
         self.cli_path = cli_path or _find_executable("agy", extra_dirs)
         self.timeout_seconds = timeout_seconds
+        self.expected_account = expected_account
 
     def is_available(self) -> bool:
         """Check if Antigravity CLI is executable on the host."""
@@ -62,6 +68,14 @@ class AntigravityRunner:
         if not self.is_available():
             raise AntigravityInvocationError("Antigravity CLI ('agy') is not available on this system.")
 
+        # Fail closed if Antigravity identity does not match expected dedicated maintenance account
+        info = discover_antigravity(self.expected_account)
+        if not info.account_matches:
+            raise AntigravityInvocationError(
+                f"Antigravity account verification failed: active account is '{info.active_account}', "
+                f"expected '{self.expected_account}'. Autonomous mutations blocked."
+            )
+
         schema = get_agent_output_json_schema()
 
         # Write schema to a temporary file for the CLI flag
@@ -72,7 +86,8 @@ class AntigravityRunner:
         cmd = [
             str(self.cli_path),
             "--print",
-            "--dangerously-skip-permissions",
+            "--mode",
+            "accept-edits",
             "--output-format",
             "json",
             "--json-schema",

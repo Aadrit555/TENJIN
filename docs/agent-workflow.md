@@ -49,9 +49,9 @@ TENJIN does not dump entire repositories into the agent context. Instead, it bui
 
 Antigravity is invoked using the discovered local CLI:
 ```bash
-agy --print --dangerously-skip-permissions --output-format json --json-schema schema.json --add-dir <workspace> -p <prompt>
+agy --print --mode accept-edits --output-format json --json-schema schema.json --add-dir <workspace> -p <prompt>
 ```
-All executions have strict timeouts (`agent_timeout_seconds`) and run in a scrubbed environment without access to developer credentials.
+All executions have strict timeouts (`agent_timeout_seconds`), validate expected account identity (`jhonbailey456@gmail.com`), and run in a scrubbed environment without access to developer credentials.
 
 ---
 
