@@ -13,11 +13,15 @@ from pydantic import BaseModel, Field
 
 from tenjin.core.constants import (
     AutonomyLevel,
+    DeferredStatus,
+    FindingResolution,
     FindingSeverity,
     FindingSource,
     FindingStatus,
+    MissionType,
     RiskLevel,
     State,
+    WorkClassification,
 )
 
 
@@ -34,6 +38,7 @@ class RepositoryRecord(BaseModel):
     url: str
     clone_url: str
     default_branch: str = "main"
+    is_managed: bool = False
     is_private: bool = False
     is_fork: bool = False
     is_archived: bool = False
@@ -201,3 +206,80 @@ class MutationJournalRecord(BaseModel):
     commit_sha: Optional[str] = None
     verified: bool = False
     timestamp: str = Field(default_factory=utc_now_iso)
+
+
+class DailyMissionRecord(BaseModel):
+    """Record of a daily maintenance mission executed on a selected repository."""
+    mission_id: str
+    repository: str
+    mission_date: str
+    mission_type: MissionType = MissionType.FULL_MAINTENANCE
+    status: str = "planned"
+    base_sha: Optional[str] = None
+    head_sha: Optional[str] = None
+    estimated_cost: int = 0
+    budget_allocated: int = 0
+    findings_targeted: List[str] = Field(default_factory=list)
+    findings_resolved: List[str] = Field(default_factory=list)
+    findings_unchanged: List[str] = Field(default_factory=list)
+    findings_new: List[str] = Field(default_factory=list)
+    deletion_guard_passed: bool = True
+    verified_diff_hash: Optional[str] = None
+    commit_sha: Optional[str] = None
+    branch_pushed: Optional[str] = None
+    pr_url: Optional[str] = None
+    summary: Optional[str] = None
+    started_at: str = Field(default_factory=utc_now_iso)
+    ended_at: Optional[str] = None
+    error_message: Optional[str] = None
+
+
+class DeferredTaskRecord(BaseModel):
+    """Record of maintenance work deferred due to budget, risk, or dependencies."""
+    id: str
+    repository: str
+    mission_id: str
+    finding_ids: List[str] = Field(default_factory=list)
+    title: str
+    evidence: str
+    proposed_plan: str
+    affected_files: List[str] = Field(default_factory=list)
+    estimated_cost: int = 0
+    reason_for_deferral: str
+    status: DeferredStatus = DeferredStatus.DEFERRED_BUDGET
+    attempts_count: int = 0
+    created_at: str = Field(default_factory=utc_now_iso)
+    updated_at: str = Field(default_factory=utc_now_iso)
+
+
+class BaselineManifestRecord(BaseModel):
+    """Immutable snapshot of tracked files and hashes prior to mutation."""
+    id: Optional[int] = None
+    run_id: str
+    repository: str
+    base_sha: str
+    tracked_files: List[str] = Field(default_factory=list)
+    file_hashes: Dict[str, str] = Field(default_factory=dict)
+    captured_at: str = Field(default_factory=utc_now_iso)
+
+
+class DeletionViolationRecord(BaseModel):
+    """Record of an attempted permanent deletion of an existing tracked file."""
+    id: Optional[int] = None
+    run_id: str
+    repository: str
+    deleted_file: str
+    restored: bool = False
+    detected_at: str = Field(default_factory=utc_now_iso)
+
+
+class DiffFreezeRecord(BaseModel):
+    """Verified diff hash validation immediately prior to Git staging."""
+    id: Optional[int] = None
+    run_id: str
+    repository: str
+    verified_diff_hash: str
+    pre_commit_diff_hash: str
+    is_match: bool
+    frozen_at: str = Field(default_factory=utc_now_iso)
+
