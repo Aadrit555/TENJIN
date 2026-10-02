@@ -70,7 +70,8 @@ class RepositoryDiscoveryService:
             if def_branch_ref and isinstance(def_branch_ref, dict):
                 default_branch = def_branch_ref.get("name") or "main"
 
-            clone_url = r.get("url") + ".git" if r.get("url") else f"https://github.com/{full_name}.git"
+            repo_url = r.get("url")
+            clone_url = f"{repo_url}.git" if repo_url else f"https://github.com/{full_name}.git"
 
             owner = r.get("owner", {}).get("login") if isinstance(r.get("owner"), dict) else full_name.split("/")[0]
 
