@@ -73,9 +73,20 @@ DEFAULT_MANAGED_REPOSITORIES: List[str] = [
 class BudgetConfig(BaseModel):
     """Context, token, and reasoning budget management."""
     context_budget_tokens: int = Field(default=200000, description="Conservative model context window budget")
+    daily_token_budget: int = Field(default=200000, description="Daily context window token budget")
     verification_reserve_ratio: float = Field(default=0.25, description="Ratio of budget strictly reserved for verification and re-audit")
     recovery_margin_ratio: float = Field(default=0.15, description="Ratio of budget reserved for error recovery")
     max_estimated_cost_per_mission: int = Field(default=150000, description="Max estimated complexity cost permitted in a single mission")
+    max_work_items_per_day: int = Field(default=50, description="Maximum work items allowed per mission")
+    cost_tracking_enabled: bool = Field(default=True, description="Enable token/cost accounting")
+
+    @property
+    def verification_reserve_pct(self) -> float:
+        return self.verification_reserve_ratio
+
+    @property
+    def recovery_reserve_pct(self) -> float:
+        return self.recovery_margin_ratio
 
 
 class DailyScheduleConfig(BaseModel):
