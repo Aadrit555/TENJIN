@@ -14,7 +14,7 @@ from typing import List, Tuple
 SECRET_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
     # GitHub Tokens
     ("GITHUB_PAT", re.compile(r"github_pat_[a-zA-Z0-9_]{22,82}", re.IGNORECASE)),
-    ("GITHUB_TOKEN", re.compile(r"gh[pousr]_[a-zA-Z0-9]{36,255}", re.IGNORECASE)),
+    ("GITHUB_TOKEN", re.compile(r"gh[pousr]_[a-zA-Z0-9]{30,255}", re.IGNORECASE)),
     # Generic Bearer Tokens
     ("BEARER_TOKEN", re.compile(r"(Bearer\s+)[a-zA-Z0-9_\-\.]{20,}", re.IGNORECASE)),
     # Private Keys (RSA, OpenSSH, EC, PGP, etc.)
