@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from tenjin.core.constants import ToolStatus
+from tenjin.core.constants import AccountMatchStatus, ToolStatus
 
 logger = logging.getLogger("tenjin.core.capabilities")
 
@@ -56,7 +56,7 @@ class GitHubAuthInfo:
 
 @dataclass
 class AntigravityInfo:
-    """Discovered Antigravity execution capabilities."""
+    """Discovered Antigravity execution capabilities and identity."""
     available: bool = False
     cli_path: Optional[str] = None
     cli_version: Optional[str] = None
@@ -64,6 +64,11 @@ class AntigravityInfo:
     sdk_version: Optional[str] = None
     models: List[str] = field(default_factory=list)
     supported_interfaces: List[str] = field(default_factory=list)
+    authenticated: bool = False
+    active_account: Optional[str] = None
+    expected_account: str = "jhonbailey456@gmail.com"
+    account_matches: bool = False
+    match_status: str = "NOT_CONFIGURED"
 
 
 @dataclass
@@ -149,9 +154,9 @@ def _find_executable(name: str, extra_paths: Optional[List[str]] = None) -> Opti
     return None
 
 
-def discover_antigravity() -> AntigravityInfo:
-    """Discover real Antigravity CLI and Python SDK availability."""
-    info = AntigravityInfo()
+def discover_antigravity(expected_account: str = "jhonbailey456@gmail.com") -> AntigravityInfo:
+    """Discover real Antigravity CLI and Python SDK availability and account match."""
+    info = AntigravityInfo(expected_account=expected_account)
     home = Path.home()
 
     # Search candidate locations for agy.exe
@@ -190,6 +195,37 @@ def discover_antigravity() -> AntigravityInfo:
         info.supported_interfaces.append("python_sdk")
     except Exception:
         info.sdk_available = False
+
+    # Check active account
+    active = (
+        os.environ.get("ANTIGRAVITY_ACCOUNT")
+        or os.environ.get("GEMINI_ACCOUNT")
+        or os.environ.get("AGY_ACCOUNT")
+    )
+    if active:
+        active = active.strip()
+
+    if not active:
+        acct_file = home / ".gemini" / "account"
+        if acct_file.is_file():
+            try:
+                active = acct_file.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+
+    info.active_account = active
+    if not active:
+        info.authenticated = False
+        info.account_matches = False
+        info.match_status = AccountMatchStatus.NOT_CONFIGURED.value
+    else:
+        info.authenticated = True
+        if active.lower() == expected_account.lower():
+            info.account_matches = True
+            info.match_status = AccountMatchStatus.MATCHED.value
+        else:
+            info.account_matches = False
+            info.match_status = AccountMatchStatus.MISMATCHED.value
 
     return info
 
@@ -275,8 +311,10 @@ def discover_hardware() -> HardwareResources:
     return res
 
 
-def discover_capabilities() -> CapabilityInventory:
+def discover_capabilities(expected_account: Optional[str] = None) -> CapabilityInventory:
     """Run full environment discovery and return complete capability inventory."""
+    if expected_account is None:
+        expected_account = os.environ.get("ANTIGRAVITY_EXPECTED_ACCOUNT", "jhonbailey456@gmail.com")
     home = Path.home()
     extra_search_dirs = [
         str(home / ".local" / "bin"),
@@ -311,7 +349,7 @@ def discover_capabilities() -> CapabilityInventory:
         gh_ver = out.splitlines()[0] if (c == 0 and out) else None
 
     gh_auth = discover_github_auth(gh_path)
-    antigravity_info = discover_antigravity()
+    antigravity_info = discover_antigravity(expected_account=expected_account)
     hw = discover_hardware()
 
     # Task scheduler check
