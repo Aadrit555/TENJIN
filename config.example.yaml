@@ -1,11 +1,42 @@
 # TENJIN Example Configuration File
-# Note: Paths left blank will be dynamically resolved relative to the runtime directory.
+# Note: Paths left blank will be dynamically resolved relative to TENJIN_HOME.
 # Secrets and tokens should never be stored directly in this file.
 
 workspace_dir: ""
 database_path: ""
 reports_dir: ""
 logs_dir: ""
+
+# The authoritative allowlist of repositories authorized for autonomous mutation
+managed_repositories:
+  - "Aadrit555/DidSomethinSLM"
+  - "Aadrit555/Mimiq2"
+  - "Aadrit555/Little-Garden"
+  - "Aadrit555/Ai-Sports-Analyzer"
+  - "Aadrit555/im-an_IDIOT"
+  - "Aadrit555/Attendance-Calculator"
+  - "Aadrit555/AETHER"
+  - "Aadrit555/Hacka1"
+  - "Aadrit555/Pokemon-First-Ever"
+  - "Aadrit555/Bus-Reservation-SystemC"
+  - "Aadrit555/DidSomethinAgain"
+
+# Expected Antigravity account identity for the autonomous worker
+antigravity_expected_account: "jhonbailey456@gmail.com"
+antigravity_cli_path: null
+
+# Daily maintenance schedule settings
+daily_schedule:
+  enabled: true
+  schedule_time: "02:00" # HH:MM 24-hour time
+  selection_strategy: "random" # "random" (uniform random across managed repos) or "weighted"
+
+# Context and token budget settings
+budget:
+  context_budget_tokens: 200000
+  verification_reserve_ratio: 0.25 # 25% strictly reserved for independent verification
+  recovery_margin_ratio: 0.15 # 15% reserved for error recovery
+  max_estimated_cost_per_mission: 150000
 
 github:
   token: null # Or set via GITHUB_TOKEN environment variable / gh auth login
@@ -36,6 +67,8 @@ timeouts:
 
 safety:
   autonomy_level: 1 # 0: Observe, 1: Audit+Report (Default), 2: Propose, 3: Commit, 4: Push, 5: PR, 6: Merge
+  deletion_guard_enabled: true # Strictly prohibits permanent deletion of existing tracked files
+  allow_major_revamps: true # Grants broad engineering authority inside authorized managed workspace
   protected_paths:
     - ".github/workflows/**"
     - "credentials/**"
@@ -52,12 +85,14 @@ safety:
     - "__pycache__/**"
     - ".git/**"
   allowed_severities_for_autofix:
+    - "critical"
+    - "high"
     - "medium"
     - "low"
     - "informational"
-  require_human_approval_for_high_risk: true
-  max_files_changed_for_autofix: 5
-  max_lines_changed_for_autofix: 150
+  require_human_approval_for_high_risk: false
+  max_files_changed_for_autofix: 1000
+  max_lines_changed_for_autofix: 50000
   auto_push_branch: false
   auto_create_pr: false
   auto_merge: false
