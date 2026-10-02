@@ -7,6 +7,7 @@ and security analyzers.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import shutil
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from tenjin.core.constants import ToolStatus
+
+logger = logging.getLogger("tenjin.core.capabilities")
 
 
 @dataclass
