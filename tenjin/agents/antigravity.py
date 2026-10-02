@@ -117,5 +117,5 @@ class AntigravityRunner:
         finally:
             try:
                 Path(schema_path).unlink(missing_ok=True)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to clean up temporary schema file %s: %s", schema_path, e)
