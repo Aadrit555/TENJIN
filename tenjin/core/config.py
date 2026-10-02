@@ -7,6 +7,7 @@ or local project root dynamically.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,8 @@ import yaml
 from pydantic import BaseModel, Field
 
 from tenjin.core.constants import AutonomyLevel
+
+logger = logging.getLogger("tenjin.core.config")
 
 
 class GitHubConfig(BaseModel):
@@ -173,8 +176,8 @@ def load_config(config_path: Optional[str | Path] = None) -> TenjinConfig:
                     if isinstance(content, dict):
                         data = content
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to parse config file at %s: %s", candidate, e)
 
     cfg = TenjinConfig(**data)
 
