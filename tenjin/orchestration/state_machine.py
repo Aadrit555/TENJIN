@@ -22,7 +22,7 @@ LEGAL_TRANSITIONS: Dict[State, Set[State]] = {
     State.DISCOVERING: {State.QUEUED, State.FAILED},
     State.QUEUED: {State.SELECTING, State.BLOCKED, State.SKIPPED},
     State.SELECTING: {State.PREPARING, State.SKIPPED, State.FAILED},
-    State.PREPARING: {State.SYNCING, State.BLOCKED, State.FAILED},
+    State.PREPARING: {State.SYNCING, State.INVENTORYING, State.BLOCKED, State.FAILED},
     State.SYNCING: {State.INVENTORYING, State.FAILED},
     State.INVENTORYING: {State.AUDITING, State.FAILED},
     State.AUDITING: {State.PLANNING, State.FAILED},
