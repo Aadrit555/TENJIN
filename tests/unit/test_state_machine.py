@@ -20,6 +20,11 @@ def temp_db():
 
 
 def test_legal_state_transitions(temp_db):
+    from tenjin.memory.models import RepositoryRecord
+    temp_db.upsert_repository(RepositoryRecord(
+        full_name="owner/repo", owner="owner", name="repo",
+        url="https://github.com/owner/repo", clone_url="https://github.com/owner/repo.git"
+    ))
     run = RunRecord(
         run_id="run_test_sm_1",
         repository="owner/repo",
@@ -46,6 +51,11 @@ def test_legal_state_transitions(temp_db):
 
 
 def test_illegal_state_transition_raises_error(temp_db):
+    from tenjin.memory.models import RepositoryRecord
+    temp_db.upsert_repository(RepositoryRecord(
+        full_name="owner/repo", owner="owner", name="repo",
+        url="https://github.com/owner/repo", clone_url="https://github.com/owner/repo.git"
+    ))
     run = RunRecord(
         run_id="run_test_sm_2",
         repository="owner/repo",
