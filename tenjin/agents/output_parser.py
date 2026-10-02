@@ -26,7 +26,7 @@ class AgentRepairResult(BaseModel):
     tests_failed: bool = False
     verification_notes: str = ""
     risk_notes: str = ""
-    remaining_issues: List[str] = field(default_factory=list)
+    remaining_issues: List[str] = Field(default_factory=list)
     suggested_commit_message: str = Field(default="fix: resolve audit finding")
     should_commit: bool = False
     should_push: bool = False
