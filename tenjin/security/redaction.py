@@ -63,15 +63,13 @@ def redact_secrets(text: str) -> str:
     # Handle Database URIs separately to keep protocol and host
     for label, pattern in SECRET_PATTERNS:
         if label == "DB_URI":
-            sanitized = pattern.sub(
-                lambda m: m.group(0).replace(m.group(1), "[REDACTED_PASSWORD]"),
-                sanitized,
-            )
+            def _replace_db(m: re.Match[str]) -> str:
+                return m.group(0).replace(m.group(1), "[REDACTED_PASSWORD]")
+            sanitized = pattern.sub(_replace_db, sanitized)
         elif label == "KEY_VALUE_SECRET":
-            sanitized = pattern.sub(
-                lambda m, lbl=label: m.group(0).replace(m.group(1), f"[REDACTED_{lbl}]"),
-                sanitized,
-            )
+            def _replace_kv(m: re.Match[str]) -> str:
+                return m.group(0).replace(m.group(1), "[REDACTED_KEY_VALUE_SECRET]")
+            sanitized = pattern.sub(_replace_kv, sanitized)
         elif label == "BEARER_TOKEN":
             sanitized = pattern.sub(r"\1[REDACTED_BEARER_TOKEN]", sanitized)
         else:
