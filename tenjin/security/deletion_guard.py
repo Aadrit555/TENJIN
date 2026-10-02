@@ -146,7 +146,10 @@ class DeletionGuard:
                 deleted_file=rel_file,
                 restored=restored,
             )
-            db.record_deletion_violation(violation)
+            try:
+                db.record_deletion_violation(violation)
+            except Exception as e:
+                logger.error("Failed to record deletion violation in database: %s", e)
             logger.info("Restored deleted tracked file %s (success: %s)", rel_file, restored)
 
         return False

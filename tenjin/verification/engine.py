@@ -2,22 +2,31 @@
 
 Crucial architecture property: Antigravity cannot be its own verifier.
 This engine independently verifies that agent changes respect file scope, introduce no
-new secrets, pass tests and linters, compile successfully, and actually resolve the audit finding.
+new secrets, pass tests and linters, compile successfully, preserve existing tracked files
+(Deletion Guard), freeze the diff hash before commit, and actually resolve the audit findings.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from tenjin.audit.engine import AuditEngine
 from tenjin.core.capabilities import CapabilityInventory
-from tenjin.memory.models import FindingRecord
+from tenjin.core.constants import FindingResolution, FindingSeverity
+from tenjin.memory.database import Database
+from tenjin.memory.models import (
+    BaselineManifestRecord,
+    DiffFreezeRecord,
+    FindingRecord,
+)
 from tenjin.policies.policy import EffectivePolicy
 from tenjin.repositories.project_detection import ProjectProfile
+from tenjin.security.deletion_guard import DeletionGuard
 from tenjin.security.isolation import get_sanitized_environment
 from tenjin.security.redaction import redact_secrets, scan_diff_for_secrets
 
@@ -35,6 +44,12 @@ class VerificationResult:
     types_passed: bool
     security_passed: bool
     re_audit_passed: bool
+    deletion_guard_passed: bool = True
+    diff_freeze_hash: Optional[str] = None
+    diff_freeze_verified: bool = True
+    resolved_findings: List[str] = field(default_factory=list)
+    unchanged_findings: List[str] = field(default_factory=list)
+    new_findings: List[str] = field(default_factory=list)
     failures: List[str] = field(default_factory=list)
     details: Dict[str, Any] = field(default_factory=dict)
 
@@ -42,24 +57,67 @@ class VerificationResult:
 class VerificationEngine:
     """Executes non-simulated independent verification of repository modifications."""
 
-    def __init__(self, capabilities: CapabilityInventory, audit_engine: AuditEngine):
+    def __init__(
+        self,
+        capabilities: CapabilityInventory,
+        audit_engine: AuditEngine,
+        db: Optional[Database] = None,
+    ):
         self.capabilities = capabilities
         self.audit_engine = audit_engine
+        self.db = db
+
+    def compute_diff_hash(self, workspace_path: Path) -> str:
+        """Compute the SHA-256 fingerprint of the current workspace Git diff."""
+        git_path = self.capabilities.git_path or "git"
+        try:
+            res = subprocess.run(
+                [git_path, "diff", "HEAD"],
+                cwd=str(workspace_path),
+                capture_output=True,
+                text=True,
+                timeout=30.0,
+            )
+            raw_diff = res.stdout if res.returncode == 0 else ""
+            return hashlib.sha256(raw_diff.encode("utf-8")).hexdigest()
+        except Exception as e:
+            logger.error("Failed to compute diff hash in %s: %s", workspace_path, e)
+            return ""
 
     def verify_repair(
         self,
         repository_name: str,
         workspace_path: Path,
-        finding: FindingRecord,
+        finding: Optional[FindingRecord],
         run_id: str,
         changed_files: List[str],
         diff_text: str,
         policy: EffectivePolicy,
         project_profile: ProjectProfile,
+        baseline_manifest: Optional[BaselineManifestRecord] = None,
+        baseline_findings: Optional[List[FindingRecord]] = None,
+        targeted_finding_ids: Optional[List[str]] = None,
     ) -> VerificationResult:
         """Run complete independent verification pipeline on modified workspace."""
         failures: List[str] = []
         details: Dict[str, Any] = {}
+
+        # 0. Enforce Deletion Guard
+        deletion_guard_passed = True
+        if self.db and baseline_manifest:
+            guard = DeletionGuard(git_path=self.capabilities.git_path or "git")
+            no_deletions = guard.enforce_and_restore(
+                repo_path=workspace_path,
+                baseline=baseline_manifest,
+                run_id=run_id,
+                db=self.db,
+            )
+            if not no_deletions:
+                deletion_guard_passed = False
+                failures.append(
+                    "Deletion Guard violation: agent attempted permanent deletion of existing tracked files; files were restored from baseline."
+                )
+        details["deletion_guard_passed"] = deletion_guard_passed
 
         # 1. Diff Validity & Scope Check
         diff_valid = True
@@ -70,7 +128,9 @@ class VerificationEngine:
         # Check maximum file count limit
         if len(changed_files) > policy.max_files:
             diff_valid = False
-            failures.append(f"Scope violation: modified {len(changed_files)} files (maximum allowed is {policy.max_files}).")
+            failures.append(
+                f"Scope violation: modified {len(changed_files)} files (maximum allowed is {policy.max_files})."
+            )
 
         # Check for protected paths
         for f in changed_files:
@@ -117,7 +177,7 @@ class VerificationEngine:
                 failures.append(f"Test suite failed ({' '.join(cmd)}): {redact_secrets(err or out)[:200]}")
         details["tests_passed"] = tests_passed
 
-        # 6. Re-audit Changed Area to Confirm Finding Resolved
+        # 6. Post-Audit & Baseline Finding Resolution Comparison
         re_audit_passed = True
         post_audit_findings = self.audit_engine.run_audit(
             repository_name=repository_name,
@@ -125,29 +185,68 @@ class VerificationEngine:
             run_id=f"re_audit_{run_id}",
         )
 
-        # Check if the original finding fingerprint is still present
-        still_present = any(pf.fingerprint == finding.fingerprint for pf in post_audit_findings)
-        if still_present:
-            re_audit_passed = False
-            failures.append("Post-fix re-audit indicates the original finding remains unresolved.")
+        resolved_ids: List[str] = []
+        unchanged_ids: List[str] = []
+        new_ids: List[str] = []
 
-        # Check if new critical/high findings were introduced (regression)
-        new_critical_or_high = [
-            pf for pf in post_audit_findings if pf.severity.value in ["critical", "high"] and pf.fingerprint != finding.fingerprint
-        ]
-        if new_critical_or_high:
+        target_ids = set(targeted_finding_ids or ([finding.id] if finding else []))
+        baseline_fps = {f.fingerprint: f for f in (baseline_findings or ([finding] if finding else []))}
+        post_fps = {f.fingerprint: f for f in post_audit_findings}
+
+        # Check resolution of targeted baseline findings
+        for fp, bf in baseline_fps.items():
+            if bf.id in target_ids or not target_ids:
+                if fp in post_fps:
+                    unchanged_ids.append(bf.id)
+                else:
+                    resolved_ids.append(bf.id)
+
+        # Check for new findings introduced by the fix
+        for fp, pf in post_fps.items():
+            if fp not in baseline_fps:
+                new_ids.append(pf.id)
+                # Fail if new finding is critical or high
+                if pf.severity in [FindingSeverity.CRITICAL, FindingSeverity.HIGH]:
+                    re_audit_passed = False
+                    failures.append(
+                        f"Regression: change introduced new {pf.severity.value} finding '{pf.title}' in {pf.file or 'workspace'}."
+                    )
+
+        # If we had targeted findings and none were resolved, verification fails
+        if target_ids and not resolved_ids and unchanged_ids:
             re_audit_passed = False
-            failures.append(f"Regression detected: change introduced {len(new_critical_or_high)} new high/critical findings.")
+            failures.append("Post-fix re-audit indicates target finding(s) remain unresolved.")
 
         details["re_audit_passed"] = re_audit_passed
+        details["resolved_count"] = len(resolved_ids)
+        details["unchanged_count"] = len(unchanged_ids)
+        details["new_count"] = len(new_ids)
+
+        # 7. Final Diff Freeze immediately before staging
+        diff_freeze_hash = self.compute_diff_hash(workspace_path)
+        diff_freeze_verified = bool(diff_freeze_hash)
+        if self.db and diff_freeze_hash:
+            freeze_record = DiffFreezeRecord(
+                run_id=run_id,
+                repository=repository_name,
+                verified_diff_hash=diff_freeze_hash,
+                pre_commit_diff_hash=diff_freeze_hash,
+                is_match=True,
+            )
+            try:
+                self.db.record_diff_freeze(freeze_record)
+            except Exception as e:
+                logger.error("Failed to record diff freeze: %s", e)
 
         overall_passed = (
-            diff_valid
+            deletion_guard_passed
+            and diff_valid
             and secrets_clean
             and lint_passed
             and types_passed
             and tests_passed
             and re_audit_passed
+            and diff_freeze_verified
         )
 
         return VerificationResult(
@@ -159,11 +258,17 @@ class VerificationEngine:
             types_passed=types_passed,
             security_passed=secrets_clean,
             re_audit_passed=re_audit_passed,
+            deletion_guard_passed=deletion_guard_passed,
+            diff_freeze_hash=diff_freeze_hash,
+            diff_freeze_verified=diff_freeze_verified,
+            resolved_findings=resolved_ids,
+            unchanged_findings=unchanged_ids,
+            new_findings=new_ids,
             failures=failures,
             details=details,
         )
 
-    def _run_command(self, cmd: List[str], cwd: Path, timeout: float = 180.0) -> tuple[int, str, str]:
+    def _run_command(self, cmd: List[str], cwd: Path, timeout: float = 180.0) -> Tuple[int, str, str]:
         """Safely execute a verification command within the isolated workspace."""
         try:
             env = get_sanitized_environment()
