@@ -53,3 +53,21 @@ def test_selection_prioritizes_never_audited_repository(temp_db):
     chosen_repo, decision = selected
     assert chosen_repo.full_name == "org/never_audited"
     assert decision.stale_audit_score == 1.0
+
+
+def test_daily_managed_repository_random_selection(temp_db):
+    cfg = TenjinConfig()
+    cfg.managed_repositories = [
+        "Aadrit555/DidSomethinSLM",
+        "Aadrit555/Mimiq2",
+        "Aadrit555/Little-Garden",
+    ]
+    selector = RepositorySelector(temp_db, cfg)
+
+    # Automatically populates managed candidates and selects one uniformly at random
+    selected = selector.select_daily_managed_repository("mission-random-1")
+    assert selected is not None
+    repo, decision = selected
+    assert repo.full_name in cfg.managed_repositories
+    assert decision.factors["selection_strategy"] == "uniform_random_managed"
+    assert decision.factors["pool_size"] == 3

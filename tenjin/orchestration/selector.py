@@ -1,8 +1,8 @@
 """TENJIN Autonomous Repository Selection Engine.
 
-Evaluates observable repository state (audit staleness, recent push activity,
-open high-severity findings, starvation thresholds) using configurable weights.
-Records structured selection rationale and prevents monopolization.
+Supports both uniform random daily selection across the managed 11-repository
+allowlist and weighted multi-factor scoring (audit staleness, push activity,
+open high-severity findings, starvation thresholds). Records structured rationale.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import List, Optional, Tuple
 from tenjin.core.config import TenjinConfig
 from tenjin.memory.database import Database
 from tenjin.memory.models import RepositoryRecord, SelectionDecisionRecord
+from tenjin.policies.policy import is_repository_managed
 
 logger = logging.getLogger("tenjin.orchestration.selector")
 
@@ -24,7 +25,6 @@ def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
     if not dt_str:
         return None
     try:
-        # Handle 'Z' suffix
         cleaned = dt_str.replace("Z", "+00:00")
         return datetime.fromisoformat(cleaned)
     except Exception:
@@ -38,8 +38,87 @@ class RepositorySelector:
         self.db = db
         self.config = config
 
-    def select_next_repository(self, run_id: str) -> Optional[Tuple[RepositoryRecord, SelectionDecisionRecord]]:
-        """Autonomously select the highest-priority repository needing attention."""
+    def select_daily_managed_repository(
+        self,
+        mission_id: str,
+    ) -> Optional[Tuple[RepositoryRecord, SelectionDecisionRecord]]:
+        """Uniform random daily selection strictly across the managed 11-repository allowlist."""
+        all_repos = self.db.list_repositories()
+        managed_list = self.config.managed_repositories
+
+        # Filter to repositories present in the managed allowlist
+        candidates = [
+            r for r in all_repos
+            if is_repository_managed(r.full_name, managed_list)
+        ]
+
+        if not candidates:
+            # If no managed repositories exist in DB, register them now from authoritative list
+            for full_name in managed_list:
+                parts = full_name.split("/")
+                owner = parts[0] if len(parts) > 1 else ""
+                name = parts[1] if len(parts) > 1 else full_name
+                r = RepositoryRecord(
+                    full_name=full_name,
+                    owner=owner,
+                    name=name,
+                    url=f"https://github.com/{full_name}",
+                    clone_url=f"https://github.com/{full_name}.git",
+                    ssh_url=f"git@github.com:{full_name}.git",
+                    is_managed=True,
+                )
+                self.db.upsert_repository(r)
+                candidates.append(r)
+
+        # Uniform random choice among managed candidates
+        chosen = random.choice(candidates)
+
+        decision = SelectionDecisionRecord(
+            run_id=mission_id,
+            repository=chosen.full_name,
+            score=1.0,
+            stale_audit_score=1.0,
+            activity_score=1.0,
+            unresolved_findings_score=0.0,
+            exploration_score=1.0,
+            factors={
+                "selection_strategy": "uniform_random_managed",
+                "pool_size": len(candidates),
+                "managed_allowlist_size": len(managed_list),
+            },
+        )
+        self.db.record_selection_decision(decision)
+        logger.info(
+            "Uniform random selection selected managed repository %s (out of %d candidates) for mission %s",
+            chosen.full_name,
+            len(candidates),
+            mission_id,
+        )
+        return chosen, decision
+
+    def select_next_repository(
+        self,
+        run_id: str,
+        strategy: Optional[str] = None,
+    ) -> Optional[Tuple[RepositoryRecord, SelectionDecisionRecord]]:
+        """Select next repository using configured or specified strategy."""
+        chosen_strategy = strategy or self.config.schedule.selection_strategy
+
+        if chosen_strategy == "random":
+            all_repos = self.db.list_repositories()
+            managed_candidates = [
+                r for r in all_repos
+                if is_repository_managed(r.full_name, self.config.managed_repositories)
+            ]
+            if managed_candidates:
+                return self.select_daily_managed_repository(run_id)
+
+        return self._select_weighted_repository(run_id)
+
+    def _select_weighted_repository(
+        self, run_id: str
+    ) -> Optional[Tuple[RepositoryRecord, SelectionDecisionRecord]]:
+        """Weighted multi-factor repository selection."""
         repositories = self.db.list_repositories()
         if not repositories:
             logger.info("No repositories available in database for selection.")
@@ -55,11 +134,9 @@ class RepositorySelector:
             stale_score = 0.0
             last_audit = parse_iso_datetime(repo.last_audit_at)
             if not last_audit:
-                # Never audited receives max priority
                 stale_score = 1.0
             else:
                 elapsed_hours = (now - last_audit).total_seconds() / 3600.0
-                # Cooldown check: skip if audited within cooldown window
                 if elapsed_hours < cfg_sel.cooldown_hours:
                     logger.debug("Skipping %s: in cooldown period (%.1f h < %.1f h)", repo.full_name, elapsed_hours, cfg_sel.cooldown_hours)
                     continue
@@ -74,12 +151,14 @@ class RepositorySelector:
             last_push = parse_iso_datetime(repo.pushed_at)
             if last_push:
                 push_age_days = (now - last_push).total_seconds() / 86400.0
-                # Recent push within 7 days gives higher score
                 activity_score = max(0.0, 1.0 - (push_age_days / 14.0))
 
             # 3. Unresolved Findings Factor (0.0 to 1.0)
             open_findings = self.db.list_findings(repository=repo.full_name)
-            critical_high_count = sum(1 for f in open_findings if f.severity.value in ["critical", "high"] and f.status.value == "open")
+            critical_high_count = sum(
+                1 for f in open_findings
+                if f.severity.value in ["critical", "high"] and f.status.value == "open"
+            )
             findings_score = min(1.0, critical_high_count * 0.3)
 
             # 4. Exploration Contribution (stochastic tie-breaker)

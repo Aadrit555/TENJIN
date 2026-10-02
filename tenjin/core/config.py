@@ -180,6 +180,10 @@ class TenjinConfig(BaseModel):
     notifications: NotificationConfig = Field(default_factory=NotificationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
+    @property
+    def schedule(self) -> DailyScheduleConfig:
+        return self.daily_schedule
+
     def is_repository_managed(self, full_name: str) -> bool:
         """Check if a repository is explicitly authorized in the managed allowlist."""
         normalized = full_name.strip().lower()
