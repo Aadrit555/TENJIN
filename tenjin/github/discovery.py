@@ -50,7 +50,8 @@ class RepositoryDiscoveryService:
                 continue
 
             # Topic filtering if specified
-            topics = [t["name"] if isinstance(t, dict) else str(t) for t in r.get("repositoryTopics", [])]
+            raw_topics = r.get("repositoryTopics") or []
+            topics = [t["name"] if isinstance(t, dict) else str(t) for t in raw_topics]
             if self.config.github.included_topics:
                 if not any(t in self.config.github.included_topics for t in topics):
                     logger.debug("Skipping repository %s: missing required topics", full_name)
