@@ -179,8 +179,8 @@ def detect_project_profile(repo_path: Path, capabilities: CapabilityInventory) -
                     if isinstance(wf_data, dict):
                         # Extract steps if relevant
                         pass
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to parse workflow file %s: %s", wf_file, e)
 
     ecosystem = "generic"
     if len(languages) == 1:
