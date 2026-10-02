@@ -45,7 +45,7 @@ def get_sanitized_environment(extra_vars: Optional[Dict[str, str]] = None) -> Di
 
 
 def verify_path_containment(child_path: str | Path, parent_workspace: str | Path) -> bool:
-    """Verify that a path is strictly contained within the designated workspace.
+    r"""Verify that a path is strictly contained within the designated workspace.
 
     Prevents directory traversal attacks (e.g. `../../etc/passwd` or `..\..\Windows`).
     """
