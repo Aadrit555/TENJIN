@@ -31,3 +31,12 @@ def test_risk_trivial_for_minor_fix():
     diff = "+ updated docs"
     risk = evaluate_change_risk(files, diff, baseline_risk=RiskLevel.TRIVIAL)
     assert risk == RiskLevel.TRIVIAL
+
+
+def test_risk_allows_large_diff_when_major_revamps_enabled():
+    files = ["src/utils.py", "src/core.py"]
+    diff = "\n".join([f"+ line {i}" for i in range(400)])
+    risk = evaluate_change_risk(
+        files, diff, baseline_risk=RiskLevel.LOW, max_lines_threshold=100, allow_major_revamps=True
+    )
+    assert risk == RiskLevel.MEDIUM
